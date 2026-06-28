@@ -1,0 +1,27 @@
+body{
+
+    font-family:sans-serif;
+
+    max-width:900px;
+
+    margin:auto;
+
+    padding:30px;
+
+}
+
+h1{
+
+    color:#006699;
+
+}
+
+#status{
+
+    padding:10px;
+
+    background:#eef;
+
+    border-radius:5px;
+
+}
