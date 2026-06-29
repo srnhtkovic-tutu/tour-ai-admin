@@ -123,92 +123,92 @@ document
 
 async function saveSpot(){
 
-    if(currentSpot){
+    if(!currentSpot){
 
-    const guideData={
+        const guideData={
 
-        catchCopy:
-        document.getElementById("catchCopy").value,
+            catchCopy:
+            document.getElementById("catchCopy").value,
 
-        topReason:
-        document.getElementById("topReason").value,
+            topReason:
+            document.getElementById("topReason").value,
 
-        ownerExperience:
-        document.getElementById("ownerExperience").value,
+            ownerExperience:
+            document.getElementById("ownerExperience").value,
 
-        highlightPoints:[
+            highlightPoints:[
 
-            document.getElementById("point1").value,
+                document.getElementById("point1").value,
 
-            document.getElementById("point2").value,
+                document.getElementById("point2").value,
 
-            document.getElementById("point3").value
+                document.getElementById("point3").value
+            ]
 
-        ]
+        };
 
-    };
+        const {error}=await supabaseClient
 
-    const {error}=await supabaseClient
+            .from("spots")
 
-    .from("spots")
+            .update({
 
-    .update({
+            name:
+            document.getElementById("name").value,
 
-        name:
-        document.getElementById("name").value,
+            lat:Number(
+                document.getElementById("lat").value
+            ),
 
-        lat:Number(
-            document.getElementById("lat").value
-        ),
+            lng:Number(
+                document.getElementById("lng").value
+            ),
 
-        lng:Number(
-            document.getElementById("lng").value
-        ),
+            guide_data:guideData
 
-        guide_data:guideData
+        })
 
-    })
+        .eq("id",currentSpot.id);
 
-    .eq("id",currentSpot.id);
+        if(error){
 
-    if(error){
+            alert(error.message);
 
-        alert(error.message);
+            console.error(error);
 
-        console.error(error);
+            return;
 
-        return;
+        }
+        alert("保存しました！");
 
+        loadSpots();
+
+    }else{
+        const {error}=await supabaseClient
+
+            .from("spots")
+
+            .insert({
+
+            name:
+                document.getElementById("name").value,
+
+            lat:Number(
+                document.getElementById("lat").value
+            ),
+
+            lng:Number(
+                document.getElementById("lng").value
+            ),
+
+            guide_data:guideData
+
+            });
+
+        await loadSpots();
+
+        alert("追加しました！");
     }
-    alert("保存しました！");
-
-    loadSpots();
-
-}else{
-    const {error}=await supabaseClient
-
-.from("spots")
-
-.insert({
-
-    name:
-    document.getElementById("name").value,
-
-    lat:Number(
-        document.getElementById("lat").value
-    ),
-
-    lng:Number(
-        document.getElementById("lng").value
-    ),
-
-    guide_data:guideData
-
-});
-    await loadSpots();
-
-    alert("追加しました！");
-}
 
 }
 
