@@ -4,25 +4,16 @@
 <head>
 
 <meta charset="UTF-8">
-
 <title>観光AI 管理画面</title>
 
 <link rel="stylesheet" href="style.css">
 
 <link
-rel="stylesheet"
-href="https://unpkg.com/leaflet/dist/leaflet.css">
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <script
-src="https://unpkg.com/leaflet/dist/leaflet.js">
-</script>
-
-<link
-rel="stylesheet"
-href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
-<script
-src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
 </script>
 
 </head>
@@ -35,101 +26,89 @@ src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
 
 <div class="container">
 
+    <!-- 左側：スポット一覧 -->
     <div class="leftPanel">
 
         <button id="newButton">
-            ＋新しいスポット
+            ＋ 新しいスポット
         </button>
 
         <table>
 
             <thead>
-
-            <tr>
-
-                <th>名前</th>
-
-                <th></th>
-
-            </tr>
-
+                <tr>
+                    <th>名前</th>
+                    <th></th>
+                </tr>
             </thead>
 
             <tbody id="spotBody">
-
             </tbody>
 
         </table>
 
     </div>
 
+    <!-- 右側 -->
     <div class="editor-area">
 
+        <!-- 編集フォーム -->
         <div class="editor">
-
-            <div class="rightPanel">
 
             <h2>スポット編集</h2>
 
             <label>スポット名</label>
-
             <input id="name">
 
             <label>緯度</label>
-
             <input id="lat">
 
             <label>経度</label>
-
             <input id="lng">
 
             <label>キャッチコピー</label>
-
             <input id="catchCopy">
 
             <label>一番伝えたい魅力</label>
-
             <input id="topReason">
 
             <label>オーナー体験</label>
-
             <textarea
                 id="ownerExperience"
                 rows="5">
             </textarea>
 
             <label>見どころ①</label>
-
             <input id="point1">
 
             <label>見どころ②</label>
-
             <input id="point2">
 
             <label>見どころ③</label>
-
             <input id="point3">
 
-           <h3>位置設定</h3>
+            <button id="saveButton">
+                保存
+            </button>
+
+        </div>
+
+        <!-- 地図 -->
+        <div class="mapPanel">
+
+            <h3>位置設定</h3>
 
             <p>
-            地図をクリック、またはピンをドラッグしてください。
+                地図をクリック、またはピンをドラッグしてください。
             </p>
 
-        <div id="map"></div>
-
-            <button id="saveButton">
-
-                保存
-
-            </button>
+            <div id="map"></div>
 
         </div>
 
     </div>
 
-    <div id="map"></div>
-
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script src="main.js"></script>

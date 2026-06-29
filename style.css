@@ -2,27 +2,84 @@ body{
 
     font-family:sans-serif;
 
-    max-width:900px;
-
-    margin:auto;
-
-    padding:30px;
+    margin:30px;
 
 }
 
-h1{
+.container{
 
-    color:#006699;
+    display:flex;
+
+    gap:25px;
 
 }
 
-#status{
+.leftPanel{
 
-    padding:10px;
+    width:300px;
 
-    background:#eef;
+}
 
-    border-radius:5px;
+.editor-area{
+
+    display:flex;
+
+    gap:25px;
+
+    align-items:flex-start;
+
+}
+
+.editor{
+
+    width:420px;
+
+}
+
+.editor label{
+
+    display:block;
+
+    margin-top:12px;
+
+    font-weight:bold;
+
+}
+
+.editor input,
+.editor textarea{
+
+    width:100%;
+
+    box-sizing:border-box;
+
+    padding:8px;
+
+}
+
+#saveButton{
+
+    margin-top:20px;
+
+    padding:10px 20px;
+
+}
+
+.mapPanel{
+
+    width:500px;
+
+}
+
+#map{
+
+    width:100%;
+
+    height:650px;
+
+    border:1px solid #bbb;
+
+    border-radius:8px;
 
 }
 
@@ -32,138 +89,28 @@ table{
 
     border-collapse:collapse;
 
-    margin-top:20px;
+    margin-top:15px;
+
+}
+
+th,td{
+
+    border:1px solid #ddd;
+
+    padding:8px;
 
 }
 
 th{
 
-    background:#006699;
+    background:#0d5d8c;
 
     color:white;
-
-    padding:10px;
-
-}
-
-td{
-
-    border:1px solid #ddd;
-
-    padding:10px;
 
 }
 
 button{
 
-    padding:8px 15px;
-
     cursor:pointer;
-
-}
-
-button:hover{
-
-    background:#ddd;
-
-}
-
-.container{
-
-    display:flex;
-
-    gap:30px;
-
-}
-
-.leftPanel{
-
-    width:35%;
-
-}
-
-.rightPanel{
-
-    width:65%;
-
-}
-
-label{
-
-    display:block;
-
-    margin-top:15px;
-
-    font-weight:bold;
-
-}
-
-input{
-
-    width:100%;
-
-    padding:8px;
-
-}
-
-textarea{
-
-    width:100%;
-
-    padding:8px;
-
-}
-
-#saveButton{
-
-    margin-top:25px;
-
-    padding:12px;
-
-    width:180px;
-
-    font-size:16px;
-
-}
-
-#map{
-
-    width:100%;
-
-    height:450px;
-
-    margin-top:10px;
-
-    border:1px solid #aaa;
-
-    border-radius:8px;
-
-}
-
-.editor-area{
-
-    display:flex;
-
-    gap:20px;
-
-    align-items:flex-start;
-
-    margin-top:20px;
-
-}
-
-.editor{
-
-    flex:1;
-
-}
-
-#map{
-
-    width:450px;
-
-    height:650px;
-
-    border:1px solid #ccc;
 
 }
