@@ -24,7 +24,7 @@ async function loadSpots(){
     }
 
     document.getElementById("status").textContent=
-        `${data.length}件読み込みました ver1`;
+        `${data.length}件読み込みました ver2`;
 
     console.log(data);
 
@@ -121,94 +121,120 @@ document
     saveSpot
 );
 
-async function saveSpot(){
+async function saveSpot() {
 
-    if(!currentSpot){
+    // guide_data を作成
+    const guideData = {
 
-        const guideData={
-
-            catchCopy:
+        catchCopy:
             document.getElementById("catchCopy").value,
 
-            topReason:
+        topReason:
             document.getElementById("topReason").value,
 
-            ownerExperience:
+        ownerExperience:
             document.getElementById("ownerExperience").value,
 
-            highlightPoints:[
+        highlightPoints: [
 
-                document.getElementById("point1").value,
+            document.getElementById("point1").value,
 
-                document.getElementById("point2").value,
+            document.getElementById("point2").value,
 
-                document.getElementById("point3").value
-            ]
+            document.getElementById("point3").value
 
-        };
+        ]
 
-        const {error}=await supabaseClient
+    };
+
+    let error;
+
+    // ==========================
+    // 編集（UPDATE）
+    // ==========================
+
+    if (currentSpot) {
+
+        ({ error } = await supabaseClient
 
             .from("spots")
 
             .update({
 
-            name:
-            document.getElementById("name").value,
+                name:
+                    document.getElementById("name").value,
 
-            lat:Number(
-                document.getElementById("lat").value
-            ),
+                lat: Number(
+                    document.getElementById("lat").value
+                ),
 
-            lng:Number(
-                document.getElementById("lng").value
-            ),
+                lng: Number(
+                    document.getElementById("lng").value
+                ),
 
-            guide_data:guideData
+                guide_data: guideData
 
-        })
+            })
 
-        .eq("id",currentSpot.id);
+            .eq("id", currentSpot.id)
 
-        if(error){
+        );
+
+        if (error) {
 
             alert(error.message);
-
             console.error(error);
-
             return;
 
         }
-        alert("保存しました！");
 
-        loadSpots();
+        alert("更新しました！");
 
-    }else{
-        const {error}=await supabaseClient
+    }
+
+    // ==========================
+    // 新規追加（INSERT）
+    // ==========================
+
+    else {
+
+        ({ error } = await supabaseClient
 
             .from("spots")
 
             .insert({
 
-            name:
-                document.getElementById("name").value,
+                name:
+                    document.getElementById("name").value,
 
-            lat:Number(
-                document.getElementById("lat").value
-            ),
+                lat: Number(
+                    document.getElementById("lat").value
+                ),
 
-            lng:Number(
-                document.getElementById("lng").value
-            ),
+                lng: Number(
+                    document.getElementById("lng").value
+                ),
 
-            guide_data:guideData
+                guide_data: guideData
 
-            });
+            })
 
-        await loadSpots();
+        );
+
+        if (error) {
+
+            alert(error.message);
+            console.error(error);
+            return;
+
+        }
 
         alert("追加しました！");
+
     }
+
+    // 一覧を再読込
+    await loadSpots();
 
 }
 
