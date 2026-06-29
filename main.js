@@ -1,3 +1,7 @@
+let map;
+
+let marker;
+
 const SUPABASE_URL = "https://fugibstqzkmzplqrpovn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_CM7-Kj4GEFY0oG2EI3t-XQ_MijxwUcZ";
 
@@ -32,6 +36,95 @@ async function loadSpots(){
 
     showSpotList(spots);
 }
+
+function initializeMap(){
+
+    map=L.map("map").setView(
+        [35.2,136.1],
+        10
+    );
+
+    L.tileLayer(
+
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+
+        {
+
+            attribution:
+            "© OpenStreetMap"
+
+        }
+
+    ).addTo(map);
+
+    map.on(
+        "click",
+        onMapClick
+    );
+
+}
+
+function onMapClick(e){
+
+    setMarker(
+
+        e.latlng.lat,
+
+        e.latlng.lng
+
+    );
+
+}
+
+function setMarker(lat,lng){
+
+    document.getElementById("lat").value=
+        lat.toFixed(8);
+
+    document.getElementById("lng").value=
+        lng.toFixed(8);
+
+    if(marker){
+
+        map.removeLayer(marker);
+
+    }
+
+    marker=L.marker(
+
+        [lat,lng],
+
+        {
+
+            draggable:true
+
+        }
+
+    ).addTo(map);
+
+    marker.on(
+
+        "dragend",
+
+        function(){
+
+            const pos=
+                marker.getLatLng();
+
+            document.getElementById("lat").value=
+                pos.lat.toFixed(8);
+
+            document.getElementById("lng").value=
+                pos.lng.toFixed(8);
+
+        }
+
+    );
+
+}
+
+
+initializeMap();
 
 loadSpots();
 
@@ -111,6 +204,22 @@ function editSpot(id){
 
     document.getElementById("point3").value =
         currentSpot.guide_data?.highlightPoints?.[2] || "";
+
+    map.setView(
+
+        [spot.lat,spot.lng],
+
+        16
+
+    );
+
+    setMarker(
+
+        spot.lat,
+
+        spot.lng
+
+    );
 
 }
 
@@ -254,6 +363,21 @@ function newSpot() {
     document.getElementById("point2").value = "";
     document.getElementById("point3").value = "";
 
+    if(marker){
+
+    map.removeLayer(marker);
+
+    marker=null;
+
+    }
+
+    map.setView(
+
+        [35.2,136.1],
+
+        10
+
+    );
 }
 
 document

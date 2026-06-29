@@ -9,6 +9,22 @@
 
 <link rel="stylesheet" href="style.css">
 
+<link
+rel="stylesheet"
+href="https://unpkg.com/leaflet/dist/leaflet.css">
+
+<script
+src="https://unpkg.com/leaflet/dist/leaflet.js">
+</script>
+
+<link
+rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<script
+src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
 </head>
 
 <body>
@@ -90,6 +106,14 @@
 
         <input id="point3">
 
+        <h3>位置設定</h3>
+
+        <p>
+        地図をクリック、またはピンをドラッグしてください。
+        </p>
+
+        <div id="map"></div>
+        
         <button id="saveButton">
 
             保存
@@ -98,6 +122,10 @@
 
     </div>
 
+    <h3>位置設定</h3>
+
+    <div id="map"></div>
+    
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
