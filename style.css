@@ -139,3 +139,31 @@ textarea{
     border-radius:8px;
 
 }
+
+.editor-area{
+
+    display:flex;
+
+    gap:20px;
+
+    align-items:flex-start;
+
+    margin-top:20px;
+
+}
+
+.editor{
+
+    flex:1;
+
+}
+
+#map{
+
+    width:450px;
+
+    height:650px;
+
+    border:1px solid #ccc;
+
+}

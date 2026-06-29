@@ -63,64 +63,75 @@ src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
 
     </div>
 
-    <div class="rightPanel">
+    <div class="editor-area">
 
-        <h2>スポット編集</h2>
+        <div class="editor">
 
-        <label>スポット名</label>
+            <div class="rightPanel">
 
-        <input id="name">
+            <h2>スポット編集</h2>
 
-        <label>緯度</label>
+            <label>スポット名</label>
 
-        <input id="lat">
+            <input id="name">
 
-        <label>経度</label>
+            <label>緯度</label>
 
-        <input id="lng">
+            <input id="lat">
 
-        <label>キャッチコピー</label>
+            <label>経度</label>
 
-        <input id="catchCopy">
+            <input id="lng">
 
-        <label>一番伝えたい魅力</label>
+            <label>キャッチコピー</label>
 
-        <input id="topReason">
+            <input id="catchCopy">
 
-        <label>オーナー体験</label>
+            <label>一番伝えたい魅力</label>
 
-        <textarea
-            id="ownerExperience"
-            rows="5">
-        </textarea>
+            <input id="topReason">
 
-        <label>見どころ①</label>
+            <label>オーナー体験</label>
 
-        <input id="point1">
+            <textarea
+                id="ownerExperience"
+                rows="5">
+            </textarea>
 
-        <label>見どころ②</label>
+            <label>見どころ①</label>
 
-        <input id="point2">
+            <input id="point1">
 
-        <label>見どころ③</label>
+            <label>見どころ②</label>
 
-        <input id="point3">
+            <input id="point2">
 
-        <h3>位置設定</h3>
+            <label>見どころ③</label>
 
-        <p>
-        地図をクリック、またはピンをドラッグしてください。
-        </p>
+            <input id="point3">
+
+           <h3>位置設定</h3>
+
+            <p>
+            地図をクリック、またはピンをドラッグしてください。
+            </p>
 
         <div id="map"></div>
-        
-        <button id="saveButton">
 
-            保存
+            <button id="saveButton">
 
-        </button>
+                保存
+
+            </button>
+
+        </div>
 
     </div>
+
+    <div id="map"></div>
+
+</div>
+
 
     <h3>位置設定</h3>
 
