@@ -24,7 +24,7 @@ async function loadSpots(){
     }
 
     document.getElementById("status").textContent=
-        `${data.length}件読み込みました`;
+        `${data.length}件読み込みました ver1`;
 
     console.log(data);
 
