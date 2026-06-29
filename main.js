@@ -212,6 +212,24 @@ async function saveSpot(){
 
 }
 
+function newSpot() {
+
+    currentSpot = null;
+
+    document.getElementById("name").value = "";
+    document.getElementById("lat").value = "";
+    document.getElementById("lng").value = "";
+
+    document.getElementById("catchCopy").value = "";
+    document.getElementById("topReason").value = "";
+    document.getElementById("ownerExperience").value = "";
+
+    document.getElementById("point1").value = "";
+    document.getElementById("point2").value = "";
+    document.getElementById("point3").value = "";
+
+}
+
 document
 .getElementById("newButton")
 .addEventListener(
