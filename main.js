@@ -123,13 +123,7 @@ document
 
 async function saveSpot(){
 
-    if(!currentSpot){
-
-        alert("スポットを選択してください");
-
-        return;
-
-    }
+    if(currentSpot){
 
     const guideData={
 
@@ -186,9 +180,42 @@ async function saveSpot(){
         return;
 
     }
-
     alert("保存しました！");
 
     loadSpots();
 
+}else{
+    const {error}=await supabaseClient
+
+.from("spots")
+
+.insert({
+
+    name:
+    document.getElementById("name").value,
+
+    lat:Number(
+        document.getElementById("lat").value
+    ),
+
+    lng:Number(
+        document.getElementById("lng").value
+    ),
+
+    guide_data:guideData
+
+});
+    await loadSpots();
+
+    alert("追加しました！");
 }
+
+}
+
+document
+.getElementById("newButton")
+.addEventListener(
+    "click",
+    newSpot
+);
+
