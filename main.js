@@ -207,7 +207,7 @@ function editSpot(id){
 
     map.setView(
 
-        [spot.lat,spot.lng],
+        [currentSpot.lat,currentSpot.lng],
 
         16
 
@@ -215,9 +215,9 @@ function editSpot(id){
 
     setMarker(
 
-        spot.lat,
+        currentSpot.lat,
 
-        spot.lng
+        currentSpot.lng
 
     );
 
