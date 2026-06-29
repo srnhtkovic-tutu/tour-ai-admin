@@ -15,16 +15,35 @@
 
 <h1>まちあるきAIガイド 管理画面</h1>
 
-<p id="status">
-接続中...
-</p>
+<p id="status">接続中...</p>
 
-<div id="spotList">
+<button id="addButton">
+＋ 新しいスポット
+</button>
 
-</div>
+<table id="spotTable">
+
+<thead>
+
+<tr>
+
+<th>ID</th>
+<th>名前</th>
+<th>緯度</th>
+<th>経度</th>
+<th>操作</th>
+
+</tr>
+
+</thead>
+
+<tbody id="spotBody">
+
+</tbody>
+
+</table>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
 <script src="main.js"></script>
 
 </body>

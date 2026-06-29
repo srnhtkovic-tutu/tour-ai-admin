@@ -25,3 +25,45 @@ h1{
     border-radius:5px;
 
 }
+
+table{
+
+    width:100%;
+
+    border-collapse:collapse;
+
+    margin-top:20px;
+
+}
+
+th{
+
+    background:#006699;
+
+    color:white;
+
+    padding:10px;
+
+}
+
+td{
+
+    border:1px solid #ddd;
+
+    padding:10px;
+
+}
+
+button{
+
+    padding:8px 15px;
+
+    cursor:pointer;
+
+}
+
+button:hover{
+
+    background:#ddd;
+
+}
