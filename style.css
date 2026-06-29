@@ -67,3 +67,61 @@ button:hover{
     background:#ddd;
 
 }
+
+.container{
+
+    display:flex;
+
+    gap:30px;
+
+}
+
+.leftPanel{
+
+    width:35%;
+
+}
+
+.rightPanel{
+
+    width:65%;
+
+}
+
+label{
+
+    display:block;
+
+    margin-top:15px;
+
+    font-weight:bold;
+
+}
+
+input{
+
+    width:100%;
+
+    padding:8px;
+
+}
+
+textarea{
+
+    width:100%;
+
+    padding:8px;
+
+}
+
+#saveButton{
+
+    margin-top:25px;
+
+    padding:12px;
+
+    width:180px;
+
+    font-size:16px;
+
+}

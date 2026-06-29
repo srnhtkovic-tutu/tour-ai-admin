@@ -28,7 +28,9 @@ async function loadSpots(){
 
     console.log(data);
 
-    showSpotList(data);
+    spots = data;
+
+    showSpotList(spots);
 }
 
 loadSpots();
@@ -74,6 +76,40 @@ function showSpotList(spots){
 
 function editSpot(id){
 
-    alert(id + " を編集します");
+    currentSpot =
+        spots.find(s=>s.id===id);
+
+    if(!currentSpot){
+
+        return;
+
+    }
+
+    document.getElementById("name").value =
+        currentSpot.name;
+
+    document.getElementById("lat").value =
+        currentSpot.lat;
+
+    document.getElementById("lng").value =
+        currentSpot.lng;
+
+    document.getElementById("catchCopy").value =
+        currentSpot.guide_data?.catchCopy || "";
+
+    document.getElementById("topReason").value =
+        currentSpot.guide_data?.topReason || "";
+
+    document.getElementById("ownerExperience").value =
+        currentSpot.guide_data?.ownerExperience || "";
+
+    document.getElementById("point1").value =
+        currentSpot.guide_data?.highlightPoints?.[0] || "";
+
+    document.getElementById("point2").value =
+        currentSpot.guide_data?.highlightPoints?.[1] || "";
+
+    document.getElementById("point3").value =
+        currentSpot.guide_data?.highlightPoints?.[2] || "";
 
 }

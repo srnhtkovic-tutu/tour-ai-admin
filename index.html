@@ -17,31 +17,88 @@
 
 <p id="status">接続中...</p>
 
-<button id="addButton">
-＋ 新しいスポット
-</button>
+<div class="container">
 
-<table id="spotTable">
+    <div class="leftPanel">
 
-<thead>
+        <button id="addButton">
+            ＋ 新しいスポット
+        </button>
 
-<tr>
+        <table>
 
-<th>ID</th>
-<th>名前</th>
-<th>緯度</th>
-<th>経度</th>
-<th>操作</th>
+            <thead>
 
-</tr>
+            <tr>
 
-</thead>
+                <th>名前</th>
 
-<tbody id="spotBody">
+                <th></th>
 
-</tbody>
+            </tr>
 
-</table>
+            </thead>
+
+            <tbody id="spotBody">
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <div class="rightPanel">
+
+        <h2>スポット編集</h2>
+
+        <label>スポット名</label>
+
+        <input id="name">
+
+        <label>緯度</label>
+
+        <input id="lat">
+
+        <label>経度</label>
+
+        <input id="lng">
+
+        <label>キャッチコピー</label>
+
+        <input id="catchCopy">
+
+        <label>一番伝えたい魅力</label>
+
+        <input id="topReason">
+
+        <label>オーナー体験</label>
+
+        <textarea
+            id="ownerExperience"
+            rows="5">
+        </textarea>
+
+        <label>見どころ①</label>
+
+        <input id="point1">
+
+        <label>見どころ②</label>
+
+        <input id="point2">
+
+        <label>見どころ③</label>
+
+        <input id="point3">
+
+        <button id="saveButton">
+
+            保存
+
+        </button>
+
+    </div>
+
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script src="main.js"></script>
