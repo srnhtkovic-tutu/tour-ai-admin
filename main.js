@@ -113,3 +113,82 @@ function editSpot(id){
         currentSpot.guide_data?.highlightPoints?.[2] || "";
 
 }
+
+document
+.getElementById("saveButton")
+.addEventListener(
+    "click",
+    saveSpot
+);
+
+async function saveSpot(){
+
+    if(!currentSpot){
+
+        alert("スポットを選択してください");
+
+        return;
+
+    }
+
+    const guideData={
+
+        catchCopy:
+        document.getElementById("catchCopy").value,
+
+        topReason:
+        document.getElementById("topReason").value,
+
+        ownerExperience:
+        document.getElementById("ownerExperience").value,
+
+        highlightPoints:[
+
+            document.getElementById("point1").value,
+
+            document.getElementById("point2").value,
+
+            document.getElementById("point3").value
+
+        ]
+
+    };
+
+    const {error}=await supabaseClient
+
+    .from("spots")
+
+    .update({
+
+        name:
+        document.getElementById("name").value,
+
+        lat:Number(
+            document.getElementById("lat").value
+        ),
+
+        lng:Number(
+            document.getElementById("lng").value
+        ),
+
+        guide_data:guideData
+
+    })
+
+    .eq("id",currentSpot.id);
+
+    if(error){
+
+        alert(error.message);
+
+        console.error(error);
+
+        return;
+
+    }
+
+    alert("保存しました！");
+
+    loadSpots();
+
+}
