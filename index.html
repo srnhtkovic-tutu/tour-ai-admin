@@ -1,101 +1,118 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
-  <meta charset="UTF-8">
-  <title>観光AIガイド</title>
 
-  <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-    }
+<meta charset="UTF-8">
+<title>観光AI 管理画面</title>
 
-    #map {
-      width: 100%;
-      height: 400px;
-      background: #ddd;
-      margin-top: 20px;
-    }
+<link rel="stylesheet" href="style.css">
 
-    .setting {
-      margin-top: 20px;
-      padding: 10px;
-      background: #f0f0f0;
-      border-radius: 8px;
-    }
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
-    #distanceValue {
-      font-weight: bold;
-      color: blue;
-      font-size: 20px;
-    }
-  </style>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
 
 </head>
 
 <body>
 
-  <h1>まちあるきAIガイド</h1>
+<h1>まちあるきAIガイド 管理画面</h1>
 
-  <div class="panel">
+<p id="status">接続中...</p>
 
-    <h3>案内開始距離</h3>
+<div class="container">
 
-    <input
-      type="range"
-      id="distanceSlider"
-      min="1000"
-      max="10000"
-      step="1000"
-      value="5000"
-    >
+    <!-- 左側：スポット一覧 -->
+    <div class="leftPanel">
 
-    <p>
-      現在:
-      <span id="distanceValue">5000</span>
-      m
-    </p>
+        <button id="newButton">
+            ＋ 新しいスポット
+        </button>
 
-  </div>
+        <table>
 
-  <div class="panel">
+            <thead>
+                <tr>
+                    <th>名前</th>
+                    <th></th>
+                </tr>
+            </thead>
 
-    <p id="status">待機中</p>
+            <tbody id="spotBody">
+            </tbody>
 
-    <p id="nearestSpot">
-      最寄りスポット: なし
-    </p>
+        </table>
 
-    <p id="stayTime">
-      滞在時間: 0秒
-    </p>
+    </div>
 
-  </div>
+    <!-- 右側 -->
+    <div class="editor-area">
 
-  <div id="map"></div>
+        <!-- 編集フォーム -->
+        <div class="editor">
 
-  <div id="guidePanel"
-     style="display:none">
+            <h2>スポット編集</h2>
 
-  <h3 id="guideTitle"></h3>
+            <label>スポット名</label>
+            <input id="name">
 
-  <p id="guideMessage"></p>
+            <label>緯度</label>
+            <input id="lat">
 
-  <button id="detailBtn">
-    詳しく聞く
-  </button>
+            <label>経度</label>
+            <input id="lng">
 
-  <button id="goBtn">
-    そこに行く
-  </button>
+            <label>キャッチコピー</label>
+            <input id="catchCopy">
 
-  <button id="ignoreBtn">
-    興味がない
-  </button>
+            <label>一番伝えたい魅力</label>
+            <input id="topReason">
+
+            <label>オーナー体験</label>
+            <textarea
+                id="ownerExperience"
+                rows="5">
+            </textarea>
+
+            <label>見どころ①</label>
+            <input id="point1">
+
+            <label>見どころ②</label>
+            <input id="point2">
+
+            <label>見どころ③</label>
+            <input id="point3">
+
+            <button id="saveButton">
+                保存
+            </button>
+
+        </div>
+
+        <!-- 地図 -->
+        <div class="mapPanel">
+
+            <h3>位置設定</h3>
+
+            <p>
+                地図をクリック、またはピンをドラッグしてください。
+            </p>
+
+            <div id="map"></div>
+
+        </div>
+
+    </div>
 
 </div>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <script src="main.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script src="main.js"></script>
 
 </body>
+
 </html>
