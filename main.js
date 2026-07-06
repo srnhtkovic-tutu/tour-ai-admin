@@ -221,6 +221,9 @@ function editSpot(id){
 
     );
 
+    document.getElementById("imageUrl").value =
+    currentSpot.image_url || "";
+
 }
 
 document
@@ -281,6 +284,9 @@ async function saveSpot() {
                     document.getElementById("lng").value
                 ),
 
+                image_url:
+                    document.getElementById("imageUrl").value,
+
                 guide_data: guideData
 
             })
@@ -323,6 +329,9 @@ async function saveSpot() {
                 lng: Number(
                     document.getElementById("lng").value
                 ),
+
+                image_url:
+                    document.getElementById("imageUrl").value,
 
                 guide_data: guideData
 
