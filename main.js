@@ -2,6 +2,10 @@ let map;
 
 let marker;
 
+let currentSpot = null;
+
+let spots = [];
+
 const SUPABASE_URL = "https://fugibstqzkmzplqrpovn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_CM7-Kj4GEFY0oG2EI3t-XQ_MijxwUcZ";
 
