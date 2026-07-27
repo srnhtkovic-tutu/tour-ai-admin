@@ -65,7 +65,9 @@ const voyager = L.tileLayer(
 
     maxZoom:20
 
-};
+}
+
+);
 
 // 航空写真
 const satellite = L.tileLayer(
