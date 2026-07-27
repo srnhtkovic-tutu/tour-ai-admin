@@ -1,3 +1,9 @@
+let voyager;
+
+let satellite;
+
+let currentLayer = "map";
+
 let map;
 
 let marker;
@@ -48,18 +54,36 @@ function initializeMap(){
         18
     );
 
-L.tileLayer(
-"https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-{
-    attribution:"© CARTO",
-    maxzoom:22
-}
-).addTo(map);
+// 通常地図
+const voyager = L.tileLayer(
 
-    map.on(
-        "click",
-        onMapClick
-    );
+"https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+
+{
+
+    attribution:"© CARTO",
+
+    maxZoom:20
+
+}
+
+// 航空写真
+const satellite = L.tileLayer(
+
+"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+
+{
+
+    attribution:"Esri",
+
+    maxZoom:20
+
+}
+
+);
+
+// 最初は通常地図
+voyager.addTo(map);
 
 }
 
@@ -395,3 +419,32 @@ document
     newSpot
 );
 
+document
+.getElementById("mapTypeBtn")
+.addEventListener("click",function(){
+
+    if(currentLayer==="map"){
+
+        map.removeLayer(voyager);
+
+        satellite.addTo(map);
+
+        currentLayer="satellite";
+
+        this.textContent="🗺 通常地図";
+
+    }
+
+    else{
+
+        map.removeLayer(satellite);
+
+        voyager.addTo(map);
+
+        currentLayer="map";
+
+        this.textContent="🛰 航空写真";
+
+    }
+
+});
