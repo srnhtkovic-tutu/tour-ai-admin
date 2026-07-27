@@ -49,43 +49,55 @@ async function loadSpots(){
 
 function initializeMap(){
 
-    map=L.map("map", {maxZoom:22}).setView(
+    map = L.map("map",{
+
+        maxZoom:22
+
+    }).setView(
+
         [35.2,136.1],
+
         18
+
     );
 
-// 通常地図
-const voyager = L.tileLayer(
+    // 通常地図
+    voyager = L.tileLayer(
 
-"https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
 
-{
+        {
 
-    attribution:"© CARTO",
+            attribution:"© CARTO",
 
-    maxZoom:20
+            maxZoom:20
 
-}
+        }
 
-);
+    );
 
-// 航空写真
-const satellite = L.tileLayer(
+    // 航空写真
+    satellite = L.tileLayer(
 
-"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
 
-{
+        {
 
-    attribution:"Esri",
+            attribution:"Esri",
 
-    maxZoom:20
+            maxZoom:20
 
-}
+        }
 
-);
+    );
 
-// 最初は通常地図
-voyager.addTo(map);
+    // 最初は通常地図
+    voyager.addTo(map);
+
+    map.on(
+        "click",
+        onMapClick
+    );
 
 }
 
@@ -420,7 +432,6 @@ document
     "click",
     newSpot
 );
-
 document
 .getElementById("mapTypeBtn")
 .addEventListener("click",function(){
@@ -435,9 +446,7 @@ document
 
         this.textContent="🗺 通常地図";
 
-    }
-
-    else{
+    }else{
 
         map.removeLayer(satellite);
 
