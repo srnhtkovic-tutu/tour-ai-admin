@@ -43,15 +43,16 @@ async function loadSpots(){
 
 function initializeMap(){
 
-    map=L.map("map").setView(
+    map=L.map("map", {maxZoom:22}).setView(
         [35.2,136.1],
-        10
+        18
     );
 
 L.tileLayer(
 "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
 {
-    attribution:"© CARTO"
+    attribution:"© CARTO",
+    maxzoom:22
 }
 ).addTo(map);
 
