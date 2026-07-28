@@ -349,6 +349,27 @@ const guideData = {
             .filter(tag => tag !== "")
 
 };
+// 保存するデータ
+const spotData = {
+
+    name:
+        document.getElementById("name").value,
+
+    lat:
+        Number(document.getElementById("lat").value),
+
+    lng:
+        Number(document.getElementById("lng").value),
+
+    image_url:
+        document.getElementById("imageUrl").value,
+
+    guide_data:
+        guideData
+
+};
+
+
     let error;
 
     // ==========================
@@ -361,25 +382,7 @@ const guideData = {
 
             .from("spots")
 
-            .update({
-
-                name:
-                    document.getElementById("name").value,
-
-                lat: Number(
-                    document.getElementById("lat").value
-                ),
-
-                lng: Number(
-                    document.getElementById("lng").value
-                ),
-
-                image_url:
-                    document.getElementById("imageUrl").value,
-
-                guide_data: guideData
-
-            })
+            .update(spotData)
 
             .eq("id", currentSpot.id)
 
@@ -405,27 +408,9 @@ const guideData = {
 
         ({ error } = await supabaseClient
 
+            .insert(spotData)
+
             .from("spots")
-
-            .insert({
-
-                name:
-                    document.getElementById("name").value,
-
-                lat: Number(
-                    document.getElementById("lat").value
-                ),
-
-                lng: Number(
-                    document.getElementById("lng").value
-                ),
-
-                image_url:
-                    document.getElementById("imageUrl").value,
-
-                guide_data: guideData
-
-            })
 
         );
 
