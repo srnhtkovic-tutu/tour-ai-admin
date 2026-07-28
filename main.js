@@ -242,6 +242,31 @@ function editSpot(id){
     document.getElementById("point3").value =
         currentSpot.guide_data?.highlightPoints?.[2] || "";
 
+        document.getElementById("recommendFood").value =
+    guideData.recommendFood || "";
+
+document.getElementById("recommendHistory").value =
+    guideData.recommendHistory || "";
+
+document.getElementById("recommendRelax").value =
+    guideData.recommendRelax || "";
+
+document.getElementById("recommendActivity").value =
+    guideData.recommendActivity || "";
+
+document.getElementById("latestTopics").value =
+    guideData.latestTopics || "";
+
+document.getElementById("officialUrl").value =
+    guideData.officialUrl || "";
+
+document.getElementById("bestSeason").value =
+    guideData.bestSeason || "";
+
+document.getElementById("tags").value =
+    (guideData.tags || []).join(",");
+
+
     map.setView(
 
         [currentSpot.lat,currentSpot.lng],
@@ -273,29 +298,56 @@ document
 async function saveSpot() {
 
     // guide_data を作成
-    const guideData = {
+const guideData = {
 
-        catchCopy:
-            document.getElementById("catchCopy").value,
+    catchCopy:
+        document.getElementById("catchCopy").value,
 
-        topReason:
-            document.getElementById("topReason").value,
+    topReason:
+        document.getElementById("topReason").value,
 
-        ownerExperience:
-            document.getElementById("ownerExperience").value,
+    highlightPoints:[
 
-        highlightPoints: [
+        document.getElementById("point1").value,
 
-            document.getElementById("point1").value,
+        document.getElementById("point2").value,
 
-            document.getElementById("point2").value,
+        document.getElementById("point3").value
 
-            document.getElementById("point3").value
+    ],
 
-        ]
+    ownerExperience:
+        document.getElementById("ownerExperience").value,
 
-    };
+    recommendFood:
+        document.getElementById("recommendFood").value,
 
+    recommendHistory:
+        document.getElementById("recommendHistory").value,
+
+    recommendRelax:
+        document.getElementById("recommendRelax").value,
+
+    recommendActivity:
+        document.getElementById("recommendActivity").value,
+
+    latestTopics:
+        document.getElementById("latestTopics").value,
+
+    officialUrl:
+        document.getElementById("officialUrl").value,
+
+    bestSeason:
+        document.getElementById("bestSeason").value,
+
+    tags:
+        document.getElementById("tags")
+            .value
+            .split(",")
+            .map(tag => tag.trim())
+            .filter(tag => tag !== "")
+
+};
     let error;
 
     // ==========================

@@ -72,8 +72,17 @@
             <label>キャッチコピー</label>
             <input id="catchCopy">
 
-            <label>一番伝えたい魅力</label>
+            <label>一番の推しは？</label>
             <input id="topReason">
+
+            <label>推し　その１</label>
+            <input id="point1">
+
+            <label>推し　その２</label>
+            <input id="point2">
+
+            <label>推し　その３</label>
+            <input id="point3">
 
             <label>オーナー体験</label>
             <textarea
@@ -81,14 +90,68 @@
                 rows="5">
             </textarea>
 
-            <label>見どころ①</label>
-            <input id="point1">
+            <hr>
 
-            <label>見どころ②</label>
-            <input id="point2">
+<h3>ユーザータイプ別おすすめ</h3>
 
-            <label>見どころ③</label>
-            <input id="point3">
+<label>🍴 グルメな人におすすめ</label>
+
+<textarea
+    id="recommendFood"
+    rows="2">
+</textarea>
+
+<label>🏯 歴史好きな人におすすめ</label>
+
+<textarea
+    id="recommendHistory"
+    rows="2">
+</textarea>
+
+<label>🌿 癒されたい人におすすめ</label>
+
+<textarea
+    id="recommendRelax"
+    rows="2">
+</textarea>
+
+<label>🚴 アクティブ好きな人におすすめ</label>
+
+<textarea
+    id="recommendActivity"
+    rows="2">
+</textarea>
+
+<hr>
+
+<h3>追加情報</h3>
+
+<label>最新トピック</label>
+
+<textarea
+    id="latestTopics"
+    rows="3">
+</textarea>
+
+<label>公式URL</label>
+
+<input
+    type="text"
+    id="officialUrl">
+
+<label>ベストシーズン</label>
+
+<input
+    type="text"
+    id="bestSeason"
+    placeholder="例：春・秋">
+
+<label>タグ（カンマ区切り）</label>
+
+<input
+    type="text"
+    id="tags"
+    placeholder="例：紅葉,御朱印,国宝">
 
             <button id="saveButton">
                 保存
