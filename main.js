@@ -28,23 +28,27 @@ async function loadSpots(){
         .select("*")
         .order("id");
 
-    if(error){
+if (error) {
 
-        document.getElementById("status").textContent=
-            error.message;
+    console.error(error);
 
-        return;
+    document.getElementById("status").textContent =
+        error.message;
 
-    }
+    return;
 
-    document.getElementById("status").textContent=
-        `${data.length}件読み込みました ver2`;
+}
+    document.getElementById("status").textContent =
+        `${data.length}件読み込みました`;
 
-    console.log(data);
+console.log(data);
 
-    spots = data;
+spots = data;
 
-    showSpotList(spots);
+console.log("読み込んだspots");
+console.table(spots);
+
+showSpotList(spots);
 }
 
 function initializeMap(){
@@ -206,87 +210,84 @@ function showSpotList(spots){
 
 function editSpot(id){
 
-    currentSpot =
-        spots.find(s=>s.id===id);
+    currentSpot = spots.find(s => s.id === id);
 
     if(!currentSpot){
-
         return;
-
     }
 
+    // guide_data を取得
+    const guideData = currentSpot.guide_data || {};
+
+    // 基本情報
     document.getElementById("name").value =
-        currentSpot.name;
+        currentSpot.name || "";
 
     document.getElementById("lat").value =
-        currentSpot.lat;
+        currentSpot.lat || "";
 
     document.getElementById("lng").value =
-        currentSpot.lng;
+        currentSpot.lng || "";
 
+    document.getElementById("imageUrl").value =
+        currentSpot.image_url || "";
+
+    // guide_data
     document.getElementById("catchCopy").value =
-        currentSpot.guide_data?.catchCopy || "";
+        guideData.catchCopy || "";
 
     document.getElementById("topReason").value =
-        currentSpot.guide_data?.topReason || "";
+        guideData.topReason || "";
 
     document.getElementById("ownerExperience").value =
-        currentSpot.guide_data?.ownerExperience || "";
+        guideData.ownerExperience || "";
 
     document.getElementById("point1").value =
-        currentSpot.guide_data?.highlightPoints?.[0] || "";
+        guideData.highlightPoints?.[0] || "";
 
     document.getElementById("point2").value =
-        currentSpot.guide_data?.highlightPoints?.[1] || "";
+        guideData.highlightPoints?.[1] || "";
 
     document.getElementById("point3").value =
-        currentSpot.guide_data?.highlightPoints?.[2] || "";
+        guideData.highlightPoints?.[2] || "";
 
-        document.getElementById("recommendFood").value =
-    guideData.recommendFood || "";
+    document.getElementById("recommendFood").value =
+        guideData.recommendFood || "";
 
-document.getElementById("recommendHistory").value =
-    guideData.recommendHistory || "";
+    document.getElementById("recommendHistory").value =
+        guideData.recommendHistory || "";
 
-document.getElementById("recommendRelax").value =
-    guideData.recommendRelax || "";
+    document.getElementById("recommendRelax").value =
+        guideData.recommendRelax || "";
 
-document.getElementById("recommendActivity").value =
-    guideData.recommendActivity || "";
+    document.getElementById("recommendActivity").value =
+        guideData.recommendActivity || "";
 
-document.getElementById("latestTopics").value =
-    guideData.latestTopics || "";
+    document.getElementById("latestTopics").value =
+        guideData.latestTopics || "";
 
-document.getElementById("officialUrl").value =
-    guideData.officialUrl || "";
+    document.getElementById("officialUrl").value =
+        guideData.officialUrl || "";
 
-document.getElementById("bestSeason").value =
-    guideData.bestSeason || "";
+    document.getElementById("bestSeason").value =
+        guideData.bestSeason || "";
 
-document.getElementById("tags").value =
-    (guideData.tags || []).join(",");
+    document.getElementById("tags").value =
+        (guideData.tags || []).join(",");
 
-
+    // 地図
     map.setView(
-
-        [currentSpot.lat,currentSpot.lng],
-
+        [currentSpot.lat, currentSpot.lng],
         16
-
     );
 
     setMarker(
-
         currentSpot.lat,
-
         currentSpot.lng
-
     );
 
-    document.getElementById("imageUrl").value =
-    currentSpot.image_url || "";
-
 }
+
 
 document
 .getElementById("saveButton")
