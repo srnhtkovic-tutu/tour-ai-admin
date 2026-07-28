@@ -299,7 +299,10 @@ document
 async function saveSpot() {
 
     // guide_data を作成
-const guideData = {
+// ----------------------
+// guide_data(JSON)
+// ----------------------
+    const guideData = {
 
     catchCopy:
         document.getElementById("catchCopy").value,
@@ -350,6 +353,9 @@ const guideData = {
 
 };
 // 保存するデータ
+// ----------------------
+// spotsテーブル列
+// ----------------------
 const spotData = {
 
     name:
@@ -431,30 +437,60 @@ const spotData = {
 
 }
 
-function newSpot() {
+function clearForm(){
+
+    const ids=[
+
+        "name",
+        "lat",
+        "lng",
+        "imageUrl",
+
+        "catchCopy",
+        "topReason",
+
+        "point1",
+        "point2",
+        "point3",
+
+        "ownerExperience",
+
+        "recommendFood",
+        "recommendHistory",
+        "recommendRelax",
+        "recommendActivity",
+
+        "latestTopics",
+        "officialUrl",
+        "bestSeason",
+        "tags"
+
+    ];
+
+    ids.forEach(id=>{
+
+        document.getElementById(id).value="";
+
+    });
+
+}
+
+function newSpot(){
 
     currentSpot = null;
 
-    document.getElementById("name").value = "";
-    document.getElementById("lat").value = "";
-    document.getElementById("lng").value = "";
+    clearForm();
 
-    document.getElementById("catchCopy").value = "";
-    document.getElementById("topReason").value = "";
-    document.getElementById("ownerExperience").value = "";
-
-    document.getElementById("point1").value = "";
-    document.getElementById("point2").value = "";
-    document.getElementById("point3").value = "";
-
+    // マーカー削除
     if(marker){
 
-    map.removeLayer(marker);
+        map.removeLayer(marker);
 
-    marker=null;
+        marker = null;
 
     }
 
+    // 地図を初期位置へ
     map.setView(
 
         [35.2,136.1],
@@ -462,8 +498,8 @@ function newSpot() {
         10
 
     );
-}
 
+}
 document
 .getElementById("newButton")
 .addEventListener(
