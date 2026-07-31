@@ -414,9 +414,9 @@ const spotData = {
 
         ({ error } = await supabaseClient
 
-            .insert(spotData)
-
             .from("spots")
+
+            .insert(spotData)
 
         );
 
