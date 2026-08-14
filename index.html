@@ -66,8 +66,41 @@
             <label>経度</label>
             <input id="lng">
 
-            <label>画像URL</label>
-            <input id="imageUrl">
+            <div class="imageUploadArea">
+                <label>
+                    推し写真
+                </label>
+
+                <input
+                    type="file"
+                    id="imageFile"
+                    accept="image/*"
+                >
+
+                <div
+                    id="imagePreviewArea"
+                    style="margin-top:10px;"
+                >
+
+                    <img
+                        id="imagePreview"
+                        style="
+                            display:none;
+                            width:100%;
+                            max-width:400px;
+                            border-radius:10px;
+                        "
+                    >
+                    <button
+                        type="button"
+                        id="uploadImageBtn"
+                    >
+                        📷 写真をアップロード
+                    </button>
+
+<p id="uploadStatus"></p>
+                </div>
+            </div>
 
             <label>キャッチコピー</label>
             <input id="catchCopy">

@@ -533,3 +533,154 @@ document
     }
 
 });
+
+// =========================
+// 推し写真プレビュー
+// =========================
+
+const imageFile =
+    document.getElementById("imageFile");
+
+const imagePreview =
+    document.getElementById("imagePreview");
+
+if (imageFile) {
+
+    imageFile.addEventListener(
+        "change",
+        function () {
+
+            const file =
+                this.files[0];
+
+            if (!file) {
+
+                imagePreview.style.display =
+                    "none";
+
+                return;
+            }
+
+            // 選択した画像をプレビュー
+            const reader =
+                new FileReader();
+
+            reader.onload =
+                function (e) {
+
+                    imagePreview.src =
+                        e.target.result;
+
+                    imagePreview.style.display =
+                        "block";
+                };
+
+            reader.readAsDataURL(file);
+        }
+    );
+
+}
+
+// =========================
+// 推し写真アップロード
+// =========================
+
+const uploadImageBtn =
+    document.getElementById("uploadImageBtn");
+
+const uploadStatus =
+    document.getElementById("uploadStatus");
+
+if (uploadImageBtn) {
+
+    uploadImageBtn.addEventListener(
+        "click",
+        async function () {
+
+            const file =
+                imageFile.files[0];
+
+            if (!file) {
+
+                uploadStatus.textContent =
+                    "写真を選択してください。";
+
+                return;
+            }
+
+            uploadStatus.textContent =
+                "アップロード中...";
+
+            try {
+
+                // ファイル名を一意にする
+                const fileName =
+                    `${Date.now()}_${file.name}`;
+
+                const filePath =
+                    fileName;
+
+                const { data, error } =
+                    await supabaseClient
+                        .storage
+                        .from("spot-images")
+                        .upload(
+                            filePath,
+                            file,
+                            {
+                                cacheControl: "3600",
+                                upsert: false
+                            }
+                        );
+
+                if (error) {
+
+                    console.error(
+                        "画像アップロードエラー:",
+                        error
+                    );
+
+                    uploadStatus.textContent =
+                        "アップロードに失敗しました。";
+
+                    return;
+                }
+
+                console.log(
+                    "画像アップロード成功:",
+                    data
+                );
+
+                // 公開URL取得
+                const { data: publicData } =
+                    supabaseClient
+                        .storage
+                        .from("spot-images")
+                        .getPublicUrl(
+                            filePath
+                        );
+
+                const imageUrl =
+                    publicData.publicUrl;
+
+                console.log(
+                    "画像URL:",
+                    imageUrl
+                );
+
+                uploadStatus.textContent =
+                    "写真のアップロード成功！";
+
+            } catch (e) {
+
+                console.error(e);
+
+                uploadStatus.textContent =
+                    "アップロード中にエラーが発生しました。";
+
+            }
+
+        }
+    );
+
+}
