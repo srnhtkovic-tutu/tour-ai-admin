@@ -10,6 +10,8 @@ let marker;
 
 let currentSpot = null;
 
+let uploadedImageUrl = "";
+
 let spots = [];
 
 const SUPABASE_URL = "https://fugibstqzkmzplqrpovn.supabase.co";
@@ -229,7 +231,8 @@ function editSpot(id){
     document.getElementById("lng").value =
         currentSpot.lng || "";
 
-    document.getElementById("imageUrl").value =
+    // 画像
+    uploadedImageUrl =
         currentSpot.image_url || "";
 
     // guide_data
@@ -368,7 +371,7 @@ const spotData = {
         Number(document.getElementById("lng").value),
 
     image_url:
-        document.getElementById("imageUrl").value,
+        uploadedImageUrl,
 
     guide_data:
         guideData
@@ -478,6 +481,8 @@ function clearForm(){
 function newSpot(){
 
     currentSpot = null;
+
+    uploadedImageUrl = "";
 
     clearForm();
 
@@ -672,8 +677,7 @@ if (uploadImageBtn) {
                 // image_url欄へ自動セット
                 // =========================
 
-                document.getElementById("imageUrl").value =
-                    imageUrl;
+                uploadedImageUrl = imageUrl;
 
                 uploadStatus.textContent =
                     "写真のアップロード成功！";
