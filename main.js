@@ -210,18 +210,37 @@ function showSpotList(spots){
 
 }
 
-function editSpot(id){
+function editSpot(id) {
 
-    currentSpot = spots.find(s => s.id === id);
+    currentSpot =
+        spots.find(s => s.id === id);
 
-    if(!currentSpot){
+    if (!currentSpot) {
         return;
     }
 
-    // guide_data を取得
-    const guideData = currentSpot.guide_data || {};
+    // =================================
+    // ファイル選択欄をリセット
+    // =================================
 
+    const imageFile =
+        document.getElementById("imageFile");
+
+    if (imageFile) {
+        imageFile.value = "";
+    }
+
+    // =================================
+    // guide_data を取得
+    // =================================
+
+    const guideData =
+        currentSpot.guide_data || {};
+
+    // =================================
     // 基本情報
+    // =================================
+
     document.getElementById("name").value =
         currentSpot.name || "";
 
@@ -231,35 +250,39 @@ function editSpot(id){
     document.getElementById("lng").value =
         currentSpot.lng || "";
 
+    // =================================
     // 画像
+    // =================================
+
     uploadedImageUrl =
         currentSpot.image_url || "";
 
     const preview =
         document.getElementById("imagePreview");
 
-if (preview) {
+    if (preview) {
 
-    if (currentSpot.image_url) {
+        if (uploadedImageUrl) {
 
-        preview.src =
-            currentSpot.image_url;
+            preview.src =
+                uploadedImageUrl;
 
-        preview.style.display =
-            "block";
+            preview.style.display =
+                "block";
 
-    } else {
+        } else {
 
-        preview.src = "";
+            preview.src = "";
 
-        preview.style.display =
-            "none";
-
+            preview.style.display =
+                "none";
+        }
     }
 
-}
-
+    // =================================
     // guide_data
+    // =================================
+
     document.getElementById("catchCopy").value =
         guideData.catchCopy || "";
 
@@ -302,7 +325,10 @@ if (preview) {
     document.getElementById("tags").value =
         (guideData.tags || []).join(",");
 
+    // =================================
     // 地図
+    // =================================
+
     map.setView(
         [currentSpot.lat, currentSpot.lng],
         16
@@ -312,156 +338,6 @@ if (preview) {
         currentSpot.lat,
         currentSpot.lng
     );
-
-}
-
-
-document
-.getElementById("saveButton")
-.addEventListener(
-    "click",
-    saveSpot
-);
-
-async function saveSpot() {
-
-    // guide_data を作成
-// ----------------------
-// guide_data(JSON)
-// ----------------------
-    const guideData = {
-
-    catchCopy:
-        document.getElementById("catchCopy").value,
-
-    topReason:
-        document.getElementById("topReason").value,
-
-    highlightPoints:[
-
-        document.getElementById("point1").value,
-
-        document.getElementById("point2").value,
-
-        document.getElementById("point3").value
-
-    ],
-
-    ownerExperience:
-        document.getElementById("ownerExperience").value,
-
-    recommendFood:
-        document.getElementById("recommendFood").value,
-
-    recommendHistory:
-        document.getElementById("recommendHistory").value,
-
-    recommendRelax:
-        document.getElementById("recommendRelax").value,
-
-    recommendActivity:
-        document.getElementById("recommendActivity").value,
-
-    latestTopics:
-        document.getElementById("latestTopics").value,
-
-    officialUrl:
-        document.getElementById("officialUrl").value,
-
-    bestSeason:
-        document.getElementById("bestSeason").value,
-
-    tags:
-        document.getElementById("tags")
-            .value
-            .split(",")
-            .map(tag => tag.trim())
-            .filter(tag => tag !== "")
-
-};
-// 保存するデータ
-// ----------------------
-// spotsテーブル列
-// ----------------------
-const spotData = {
-
-    name:
-        document.getElementById("name").value,
-
-    lat:
-        Number(document.getElementById("lat").value),
-
-    lng:
-        Number(document.getElementById("lng").value),
-
-    image_url:
-        uploadedImageUrl,
-
-    guide_data:
-        guideData
-
-};
-
-
-    let error;
-
-    // ==========================
-    // 編集（UPDATE）
-    // ==========================
-
-    if (currentSpot) {
-
-        ({ error } = await supabaseClient
-
-            .from("spots")
-
-            .update(spotData)
-
-            .eq("id", currentSpot.id)
-
-        );
-
-        if (error) {
-
-            alert(error.message);
-            console.error(error);
-            return;
-
-        }
-
-        alert("更新しました！");
-
-    }
-
-    // ==========================
-    // 新規追加（INSERT）
-    // ==========================
-
-    else {
-
-        ({ error } = await supabaseClient
-
-            .from("spots")
-
-            .insert(spotData)
-
-        );
-
-        if (error) {
-
-            alert(error.message);
-            console.error(error);
-            return;
-
-        }
-
-        alert("追加しました！");
-
-    }
-
-    // 一覧を再読込
-    await loadSpots();
-
 }
 
 function clearForm(){
@@ -721,6 +597,9 @@ if (uploadImageBtn) {
                     "画像URL:",
                     imageUrl
                 );
+
+                // ★重要：DB保存用の画像URLを更新
+                uploadedImageUrl = imageUrl;
 
                 // =========================
                 // URLをフォームにセット
