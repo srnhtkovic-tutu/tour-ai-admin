@@ -230,6 +230,14 @@ function editSpot(id) {
         imageFile.value = "";
     }
 
+    const uploadStatus =
+    document.getElementById("uploadStatus");
+
+    if (uploadStatus) {
+        uploadStatus.textContent = "";
+    }
+
+
     // =================================
     // guide_data を取得
     // =================================
@@ -637,6 +645,13 @@ function clearForm(){
 
         imageFile.value = "";
 
+    }
+
+    const uploadStatus =
+    document.getElementById("uploadStatus");
+
+    if (uploadStatus) {
+        uploadStatus.textContent = "";
     }
 
 }
