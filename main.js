@@ -340,6 +340,247 @@ function editSpot(id) {
     );
 }
 
+// =========================
+// スポット保存
+// =========================
+
+const saveButton =
+    document.getElementById("saveButton");
+
+if (saveButton) {
+
+    saveButton.addEventListener(
+        "click",
+        saveSpot
+    );
+
+}
+
+
+// =========================
+// スポット保存処理
+// =========================
+
+async function saveSpot() {
+
+    console.log("保存処理開始");
+
+    // =========================
+    // guide_data
+    // =========================
+
+    const guideData = {
+
+        catchCopy:
+            document.getElementById("catchCopy").value,
+
+        topReason:
+            document.getElementById("topReason").value,
+
+        highlightPoints: [
+
+            document.getElementById("point1").value,
+
+            document.getElementById("point2").value,
+
+            document.getElementById("point3").value
+
+        ],
+
+        ownerExperience:
+            document.getElementById("ownerExperience").value,
+
+        recommendFood:
+            document.getElementById("recommendFood").value,
+
+        recommendHistory:
+            document.getElementById("recommendHistory").value,
+
+        recommendRelax:
+            document.getElementById("recommendRelax").value,
+
+        recommendActivity:
+            document.getElementById("recommendActivity").value,
+
+        latestTopics:
+            document.getElementById("latestTopics").value,
+
+        officialUrl:
+            document.getElementById("officialUrl").value,
+
+        bestSeason:
+            document.getElementById("bestSeason").value,
+
+        tags:
+            document
+                .getElementById("tags")
+                .value
+                .split(",")
+                .map(tag => tag.trim())
+                .filter(tag => tag !== "")
+
+    };
+
+
+    // =========================
+    // 保存するデータ
+    // =========================
+
+    const spotData = {
+
+        name:
+            document.getElementById("name").value,
+
+        lat:
+            Number(
+                document.getElementById("lat").value
+            ),
+
+        lng:
+            Number(
+                document.getElementById("lng").value
+            ),
+
+        image_url:
+            uploadedImageUrl,
+
+        guide_data:
+            guideData
+
+    };
+
+
+    console.log(
+        "保存データ:",
+        spotData
+    );
+
+
+    let error;
+
+
+    // =========================
+    // UPDATE
+    // =========================
+
+    if (currentSpot) {
+
+        console.log(
+            "UPDATE:",
+            currentSpot.id
+        );
+
+        ({ error } =
+            await supabaseClient
+
+                .from("spots")
+
+                .update(spotData)
+
+                .eq(
+                    "id",
+                    currentSpot.id
+                )
+        );
+
+
+        if (error) {
+
+            console.error(
+                "更新エラー:",
+                error
+            );
+
+            alert(
+                "更新に失敗しました。\n" +
+                error.message
+            );
+
+            return;
+
+        }
+
+
+        // 現在のspots配列も更新
+        currentSpot.name =
+            spotData.name;
+
+        currentSpot.lat =
+            spotData.lat;
+
+        currentSpot.lng =
+            spotData.lng;
+
+        currentSpot.image_url =
+            spotData.image_url;
+
+        currentSpot.guide_data =
+            spotData.guide_data;
+
+
+        alert(
+            "更新しました！"
+        );
+
+    }
+
+
+    // =========================
+    // INSERT
+    // =========================
+
+    else {
+
+        console.log(
+            "新規スポット追加"
+        );
+
+        ({ error } =
+            await supabaseClient
+
+                .from("spots")
+
+                .insert(spotData)
+        );
+
+
+        if (error) {
+
+            console.error(
+                "追加エラー:",
+                error
+            );
+
+            alert(
+                "追加に失敗しました。\n" +
+                error.message
+            );
+
+            return;
+
+        }
+
+
+        alert(
+            "追加しました！"
+        );
+
+    }
+
+
+    // =========================
+    // 一覧を再読み込み
+    // =========================
+
+    await loadSpots();
+
+
+    console.log(
+        "保存処理完了"
+    );
+
+}
+
 function clearForm(){
 
     const ids=[
