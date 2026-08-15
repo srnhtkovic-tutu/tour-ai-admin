@@ -235,6 +235,30 @@ function editSpot(id){
     uploadedImageUrl =
         currentSpot.image_url || "";
 
+    const preview =
+        document.getElementById("imagePreview");
+
+if (preview) {
+
+    if (currentSpot.image_url) {
+
+        preview.src =
+            currentSpot.image_url;
+
+        preview.style.display =
+            "block";
+
+    } else {
+
+        preview.src = "";
+
+        preview.style.display =
+            "none";
+
+    }
+
+}
+
     // guide_data
     document.getElementById("catchCopy").value =
         guideData.catchCopy || "";
@@ -475,6 +499,28 @@ function clearForm(){
         document.getElementById(id).value="";
 
     });
+
+    uploadedImageUrl = "";
+
+    const preview =
+        document.getElementById("imagePreview");
+
+    if (preview) {
+
+        preview.src = "";
+
+        preview.style.display = "none";
+
+    }
+
+    const imageFile =
+        document.getElementById("imageFile");
+
+    if (imageFile) {
+
+        imageFile.value = "";
+
+    }
 
 }
 
