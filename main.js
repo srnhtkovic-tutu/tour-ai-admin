@@ -668,6 +668,13 @@ if (uploadImageBtn) {
                     imageUrl
                 );
 
+                // =========================
+                // image_url欄へ自動セット
+                // =========================
+
+                document.getElementById("imageUrl").value =
+                    imageUrl;
+
                 uploadStatus.textContent =
                     "写真のアップロード成功！";
 
