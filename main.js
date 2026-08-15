@@ -664,9 +664,21 @@ if (uploadImageBtn) {
 
             try {
 
-                // ファイル名を一意にする
+                // =========================
+                // Storage用ファイル名を作成
+                // 日本語ファイル名は使用しない
+                // =========================
+
+                const extension =
+                    file.name
+                        .split(".")
+                        .pop()
+                        .toLowerCase();
+
                 const fileName =
-                    `${Date.now()}_${file.name}`;
+                    `${Date.now()}_${Math.random()
+                        .toString(36)
+                        .substring(2, 8)}.${extension}`;
 
                 const filePath =
                     fileName;
@@ -679,22 +691,12 @@ if (uploadImageBtn) {
                             filePath,
                             file,
                             {
-                                cacheControl: "3600",
                                 upsert: false
                             }
                         );
 
                 if (error) {
-
-                    console.error(
-                        "画像アップロードエラー:",
-                        error
-                    );
-
-                    uploadStatus.textContent =
-                        "アップロードに失敗しました。";
-
-                    return;
+                    throw error;
                 }
 
                 console.log(
@@ -702,17 +704,18 @@ if (uploadImageBtn) {
                     data
                 );
 
-                // 公開URL取得
-                const { data: publicData } =
+                // =========================
+                // 公開URLを取得
+                // =========================
+
+                const { data: publicUrlData } =
                     supabaseClient
                         .storage
                         .from("spot-images")
-                        .getPublicUrl(
-                            filePath
-                        );
+                        .getPublicUrl(filePath);
 
                 const imageUrl =
-                    publicData.publicUrl;
+                    publicUrlData.publicUrl;
 
                 console.log(
                     "画像URL:",
@@ -720,24 +723,31 @@ if (uploadImageBtn) {
                 );
 
                 // =========================
-                // image_url欄へ自動セット
+                // URLをフォームにセット
                 // =========================
 
-                uploadedImageUrl = imageUrl;
+                const imageUrlInput =
+                    document.getElementById("imageUrl");
+
+                if (imageUrlInput) {
+
+                    imageUrlInput.value =
+                        imageUrl;
+                }
 
                 uploadStatus.textContent =
-                    "写真のアップロード成功！";
+                    "アップロードしました。";
 
-            } catch (e) {
+            } catch (error) {
 
-                console.error(e);
+                console.error(
+                    "画像アップロードエラー:",
+                    error
+                );
 
                 uploadStatus.textContent =
-                    "アップロード中にエラーが発生しました。";
-
+                    "画像のアップロードに失敗しました。";
             }
-
         }
     );
-
 }
