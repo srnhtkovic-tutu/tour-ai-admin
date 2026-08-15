@@ -1,219 +1,290 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
+  <meta charset="UTF-8">
+  <title>まちあるきAIガイド</title>
+  <link rel="stylesheet" href="style.css">
 
-<meta charset="UTF-8">
-<title>観光AI 管理画面　ver1.1.1</title>
+  <style>
+    #map {
+      width: 100%;
+      height: 400px;
+      background: #ddd;
+      margin-top: 20px;
+    }
 
-<link rel="stylesheet" href="style.css">
+    .setting {
+      margin-top: 20px;
+      padding: 10px;
+      background: #f0f0f0;
+      border-radius: 8px;
+    }
 
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
-<script
-  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-</script>
+    #distanceValue {
+      font-weight: bold;
+      color: blue;
+      font-size: 20px;
+    }
+  </style>
 
 </head>
 
 <body>
 
-<h1>まちあるきAIガイド 管理画面　ver1.1.1</h1>
+<!-- ========================= -->
+<!-- 起動画面 -->
+<!-- ========================= -->
 
-<p id="status">接続中...</p>
+<div id="startPanel">
 
-<div class="container">
+    <h1>まちあるきAIガイド</h1>
 
-    <!-- 左側：スポット一覧 -->
-    <div class="leftPanel">
+    <p>
 
-        <button id="newButton">
-            ＋ 新しいスポット
+        あなたの旅の目的を教えてください。
+
+    </p>
+
+<!-- ========================= -->
+<!-- 言語選択 -->
+<!-- ========================= -->
+
+<div id="languageSelect">
+
+    <p>Language / 言語</p>
+
+    <button
+        type="button"
+        id="japaneseBtn"
+        class="languageBtn selected"
+    >
+        🇯🇵 日本語
+    </button>
+
+    <button
+        type="button"
+        id="englishBtn"
+        class="languageBtn"
+    >
+        🇺🇸 English
+    </button>
+
+</div>
+
+    <button class="typeBtn" data-type="グルメ">
+        🍴 グルメ
+    </button>
+
+    <button class="typeBtn" data-type="癒し・リラックス">
+        🌿 癒し・リラックス
+    </button>
+
+    <button class="typeBtn" data-type="歴史・文化探訪">
+        🏯 歴史・文化探訪
+    </button>
+
+    <button class="typeBtn" data-type="自然体験・アクティビティ">
+        🚴 自然体験・アクティビティ
+    </button>
+
+    <button id="startGuideBtn">
+
+        ▶ ガイド開始
+
+    </button>
+
+</div>
+
+
+<!-- ========================= -->
+<!-- メイン画面 -->
+<!-- ========================= -->
+
+<h1>まちあるきAIガイド Ver1.1.1</h1>
+
+<button id="toggleDebugBtn">
+⚙
+</button>
+
+<div id="debugPanel">
+  <div class="panel">
+
+      <h3>案内開始距離</h3>
+
+      <input
+          type="range"
+          id="distanceSlider"
+          min="10"
+          max="1000"
+          step="10"
+          value="30"
+      >
+
+      <p>
+
+          現在：
+
+          <span id="distanceValue">
+
+              30000
+
+          </span>
+
+          m
+
+      </p>
+
+  </div>
+
+  <div class="panel">
+
+      <p id="status">
+
+          待機中
+
+      </p>
+
+      <p id="nearestSpot">
+
+          最寄りスポット：なし
+
+      </p>
+
+      <p id="stayTime">
+
+          滞在時間：0秒
+
+      </p>
+
+  </div>
+</div>
+
+<div id="searchPanel">
+
+    <div id="searchIcon">
+        🧭
+    </div>
+
+    <h2>
+
+        探索中
+
+    </h2>
+
+    <p id="searchMessage">
+
+        おすすめスポットを探しています
+
+    </p>
+
+</div>
+
+<!-- ========================= -->
+<!-- ガイド -->
+<!-- ========================= -->
+
+<div id="guidePanel">
+
+    <div id="spotInfo">
+
+        <img id="spotImage">
+
+        <h2 id="guideTitle"></h2>
+
+        <p id="guideMessage"></p>
+
+        <button id="goBtn">
+
+            🧭 行ってみる
+
         </button>
 
-        <table>
+        <button id="ignoreBtn">
 
-            <thead>
-                <tr>
-                    <th>名前</th>
-                    <th></th>
-                </tr>
-            </thead>
+            ❌ ほかをみる
 
-            <tbody id="spotBody">
-            </tbody>
-
-        </table>
+        </button>
 
     </div>
 
-    <!-- 右側 -->
-    <div class="editor-area">
+    <button id="toggleSpotBtn">
 
-        <!-- 編集フォーム -->
-        <div class="editor">
+        ▲ スポット情報を閉じる
 
-            <h2>スポット編集</h2>
+    </button>
 
-            <label>スポット名</label>
-            <input id="name">
+    <hr>
 
-            <label>緯度</label>
-            <input id="lat">
+    <div id="chatHistory">
 
-            <label>経度</label>
-            <input id="lng">
+    </div>
 
-            <div class="imageUploadArea">
-                <label>
-                    推し写真
-                </label>
+    <div id="chatInput">
 
-                <input
-                    type="file"
-                    id="imageFile"
-                    accept="image/*"
-                >
+        <h3>
 
-                <div
-                    id="imagePreviewArea"
-                    style="margin-top:10px;"
-                >
+            💬 AIコンシェルジュ
 
-                    <img
-                        id="imagePreview"
-                        style="
-                            display:none;
-                            width:100%;
-                            max-width:400px;
-                            border-radius:10px;
-                        "
-                    >
-                    <button
-                        type="button"
-                        id="uploadImageBtn"
-                    >
-                        📷 写真をアップロード
-                    </button>
+        </h3>
 
-<p id="uploadStatus"></p>
-                </div>
-            </div>
+        <p class="chatDescription">
 
-            <label>キャッチコピー</label>
-            <input id="catchCopy">
+            気になることを自由に質問してください。
 
-            <label>一番の推しは？</label>
-            <input id="topReason">
+        </p>
 
-            <label>推し　その１</label>
-            <input id="point1">
+        <textarea
+            id="question"
+            rows="3"
+            placeholder="例：御朱印はありますか？"
+        ></textarea>
 
-            <label>推し　その２</label>
-            <input id="point2">
+        <button id="sendBtn">
 
-            <label>推し　その３</label>
-            <input id="point3">
+            💬 質問する
 
-            <label>オーナー体験</label>
-            <textarea
-                id="ownerExperience"
-                rows="5">
-            </textarea>
-
-            <hr>
-
-<h3>ユーザータイプ別おすすめ</h3>
-
-<label>🍴 グルメな人におすすめ</label>
-
-<textarea
-    id="recommendFood"
-    rows="2">
-</textarea>
-
-<label>🏯 歴史好きな人におすすめ</label>
-
-<textarea
-    id="recommendHistory"
-    rows="2">
-</textarea>
-
-<label>🌿 癒されたい人におすすめ</label>
-
-<textarea
-    id="recommendRelax"
-    rows="2">
-</textarea>
-
-<label>🚴 アクティブ好きな人におすすめ</label>
-
-<textarea
-    id="recommendActivity"
-    rows="2">
-</textarea>
-
-<hr>
-
-<h3>追加情報</h3>
-
-<label>最新トピック</label>
-
-<textarea
-    id="latestTopics"
-    rows="3">
-</textarea>
-
-<label>公式URL</label>
-
-<input
-    type="text"
-    id="officialUrl">
-
-<label>ベストシーズン</label>
-
-<input
-    type="text"
-    id="bestSeason"
-    placeholder="例：春・秋">
-
-<label>タグ（カンマ区切り）</label>
-
-<input
-    type="text"
-    id="tags"
-    placeholder="例：紅葉,御朱印,国宝">
-
-            <button id="saveButton">
-                保存
-            </button>
-
-        </div>
-
-        <!-- 地図 -->
-        <div class="mapPanel">
-
-            <h3>位置設定</h3>
-
-            <p>
-                地図をクリック、またはピンをドラッグしてください。
-            </p>
-
-            <div id="map"></div>
-
-        </div>
-        <button id="mapTypeBtn">
-            🛰 航空写真
         </button>
+
     </div>
 
 </div>
+
+
+<!-- ========================= -->
+<!-- GoogleMapから戻った画面 -->
+<!-- ========================= -->
+
+<div id="resumeScreen" style="display:none;">
+
+    <h2>
+
+        🧭 ナビゲーション中
+
+    </h2>
+
+    <p>
+
+        Googleマップで目的地へ向かっています。
+
+    </p>
+
+    <p>
+
+        現地に到着したら探索を再開してください。
+
+    </p>
+
+    <button id="resumeBtn">
+
+        ▶ 探索を再開
+
+    </button>
+
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script src="main.js"></script>
 
 </body>
-
 </html>
