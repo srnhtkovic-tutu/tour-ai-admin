@@ -70,7 +70,7 @@ function initializeMap(){
     // 通常地図
     voyager = L.tileLayer(
 
-        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_42ro_1_15e818ac440f61c9bc14f4ec",
 
         {
 
