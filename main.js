@@ -182,15 +182,9 @@ function showSpotList(spots){
 
         const row=document.createElement("tr");
 
-        row.innerHTML=`
-
-<td>${spot.id}</td>
+row.innerHTML=`
 
 <td>${spot.name}</td>
-
-<td>${Number(spot.lat).toFixed(6)}</td>
-
-<td>${Number(spot.lng).toFixed(6)}</td>
 
 <td>
 
