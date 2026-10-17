@@ -880,3 +880,60 @@ if (uploadImageBtn) {
         }
     );
 }
+
+
+/* ========================================
+   URLからスポット候補を作成
+======================================== */
+
+const generateCandidatesBtn =
+    document.getElementById("generateCandidatesBtn");
+
+if (generateCandidatesBtn) {
+    generateCandidatesBtn.addEventListener("click", async function () {
+
+        const sourceUrl =
+            document.getElementById("sourceUrl").value.trim();
+
+        const status =
+            document.getElementById("generationStatus");
+
+        const candidateList =
+            document.getElementById("candidateList");
+
+        // URLの入力チェック
+        if (!sourceUrl) {
+            status.textContent = "WebサイトのURLを入力してください。";
+            return;
+        }
+
+        let parsedUrl;
+
+        try {
+            parsedUrl = new URL(sourceUrl);
+        } catch (error) {
+            status.textContent = "URLの形式を確認してください。";
+            return;
+        }
+
+        if (
+            parsedUrl.protocol !== "https:" &&
+            parsedUrl.protocol !== "http:"
+        ) {
+            status.textContent = "http または https のURLを入力してください。";
+            return;
+        }
+
+        // 今はまだ候補生成APIには接続していません
+        status.textContent = "入力されたURLを確認しました。";
+        candidateList.replaceChildren();
+
+        const message = document.createElement("p");
+        message.textContent =
+            "URLの確認ができました。次のステップでWebサイトの読み取り機能を接続します。";
+
+        candidateList.appendChild(message);
+
+        console.log("スポット候補の取得元URL:", parsedUrl.href);
+    });
+}
