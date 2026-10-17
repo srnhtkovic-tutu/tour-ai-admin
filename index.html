@@ -33,6 +33,36 @@
             ＋ 新しいスポット
         </button>
 
+        
+<!-- URLからスポット候補を作成 -->
+<div class="urlImportPanel">
+  <h3>URLからスポット候補を作成</h3>
+
+  <p>
+    観光協会などのWebサイトから、登録候補となるスポットを作成します。
+    内容を確認してから登録できます。
+  </p>
+
+  <label for="sourceUrl">観光情報サイトのURL</label>
+  <input
+    type="url"
+    id="sourceUrl"
+    placeholder="https://www.higashiomi.net/"
+  >
+
+  <button id="generateCandidatesBtn" type="button">
+    URLから候補を作成
+  </button>
+
+  <p id="generationStatus" role="status">
+    URLを入力して「URLから候補を作成」を押してください。
+  </p>
+
+  <div id="candidateList"></div>
+</div>
+<!-- URLからスポット候補を作成 ここまで -->
+
+
         <table>
 
             <thead>
