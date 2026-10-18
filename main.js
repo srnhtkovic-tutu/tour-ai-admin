@@ -882,6 +882,7 @@ if (uploadImageBtn) {
 }
 
 
+
 /* ========================================
    URLからスポット候補を作成
 ======================================== */
@@ -902,38 +903,116 @@ if (generateCandidatesBtn) {
             document.getElementById("candidateList");
 
         // URLの入力チェック
-        if (!sourceUrl) {
-            status.textContent = "WebサイトのURLを入力してください。";
-            return;
-        }
-
         let parsedUrl;
 
         try {
             parsedUrl = new URL(sourceUrl);
         } catch (error) {
-            status.textContent = "URLの形式を確認してください。";
+            status.textContent = "URLを正しく入力してください。";
             return;
         }
 
         if (
-            parsedUrl.protocol !== "https:" &&
-            parsedUrl.protocol !== "http:"
+            parsedUrl.protocol !== "https:" ||
+            !(
+                parsedUrl.hostname === "higashiomi.net" ||
+                parsedUrl.hostname.endsWith(".higashiomi.net")
+            )
         ) {
-            status.textContent = "http または https のURLを入力してください。";
+            status.textContent =
+                "現在は東近江市観光協会のサイトのみ対応しています。";
             return;
         }
 
-        // 今はまだ候補生成APIには接続していません
-        status.textContent = "入力されたURLを確認しました。";
+        // 処理開始
+        generateCandidatesBtn.disabled = true;
+        status.textContent =
+            "Webサイトを読み取り、スポット候補を作成しています...";
         candidateList.replaceChildren();
 
-        const message = document.createElement("p");
-        message.textContent =
-            "URLの確認ができました。次のステップでWebサイトの読み取り機能を接続します。";
+        try {
+            // Supabase Edge Functionを呼び出す
+            const { data, error } =
+                await supabaseClient.functions.invoke(
+                    "generate-spot-candidates",
+                    {
+                        body: {
+                            url: parsedUrl.href
+                        }
+                    }
+                );
 
-        candidateList.appendChild(message);
+            if (error) {
+                console.error("API呼び出しエラー:", error);
+                throw new Error(
+                    "APIを呼び出せませんでした。詳細はConsoleを確認してください。"
+                );
+            }
 
-        console.log("スポット候補の取得元URL:", parsedUrl.href);
+            if (!data || !data.success) {
+                throw new Error(
+                    data?.error || "候補を作成できませんでした。"
+                );
+            }
+
+            const candidates = Array.isArray(data.candidates)
+                ? data.candidates
+                : [];
+
+            if (candidates.length === 0) {
+                status.textContent =
+                    data.message ||
+                    "候補が見つかりませんでした。個別の観光ページも試してください。";
+                return;
+            }
+
+            // 候補を画面に表示
+            candidates.forEach((spot, index) => {
+                const card = document.createElement("div");
+                card.className = "candidateItem";
+
+                const title = document.createElement("h4");
+                title.textContent =
+                    `${index + 1}. ${spot.name || "名称不明"}`;
+                card.appendChild(title);
+
+                const description = document.createElement("p");
+                description.textContent =
+                    spot.description || "紹介文はありません。";
+                card.appendChild(description);
+
+                const address = document.createElement("p");
+                address.textContent =
+                    "住所：" + (spot.address || "未取得");
+                card.appendChild(address);
+
+                const reason = document.createElement("p");
+                reason.textContent =
+                    "見どころ：" + (spot.topReason || "未取得");
+                card.appendChild(reason);
+
+                const source = document.createElement("p");
+                source.textContent =
+                    "出典：" + (spot.officialUrl || parsedUrl.href);
+                card.appendChild(source);
+
+                candidateList.appendChild(card);
+            });
+
+            status.textContent =
+                `${candidates.length}件の候補を取得しました。まだデータベースには保存されていません。`;
+
+            // 次の段階の確認用にログへ出力
+            console.log("スポット候補:", candidates);
+
+        } catch (error) {
+            console.error("スポット候補生成エラー:", error);
+
+            status.textContent =
+                error.message ||
+                "候補生成中にエラーが発生しました。";
+        } finally {
+            generateCandidatesBtn.disabled = false;
+        }
     });
 }
