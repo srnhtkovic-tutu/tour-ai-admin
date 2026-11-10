@@ -19,3 +19,19 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .panel { margin-top: 24px; padding: 24px; background: white; border: 1px solid #dce5df; border-radius: 10px; }
 .hidden { display: none; }
 @media (max-width: 520px) { .auth-card { padding: 24px; } .topbar { padding: 14px 18px; } .topbar span { display: block; margin: 4px 0 0; } .dashboard { margin-top: 28px; } }
+.topbar-actions { display:flex; align-items:center; gap:12px; }
+.secondary-link { color:#28664b; font-weight:650; text-decoration:none; }
+.management { max-width:980px; }
+.management .panel h2 { margin-top:0; }
+.inline-form { display:grid; grid-template-columns:1fr 1fr auto; align-items:end; gap:14px; }
+.inline-form label { margin-top:0; }
+.management-list { margin-top:18px; display:grid; gap:12px; }
+.management-row { padding:14px; border:1px solid #e0e8e2; border-radius:8px; display:grid; grid-template-columns:minmax(150px,1fr) auto; gap:12px; align-items:center; }
+.management-row small,.help-text,.status-text { color:#687970; line-height:1.6; }
+.management-row button { min-height:38px; padding:7px 12px; }
+.management-row .secondary-button { background:#e8efea; color:#294b39; }
+.user-row { grid-template-columns:minmax(180px,1fr) auto; }
+.assignment-controls,.assigned-regions { display:flex; flex-wrap:wrap; gap:8px; grid-column:1/-1; }
+.assignment-controls select { flex:1; min-width:160px; }
+.status-text { font-size:13px; }
+@media(max-width:700px){.inline-form,.management-row,.user-row{grid-template-columns:1fr}.inline-form button{width:100%}.topbar-actions{flex-wrap:wrap;justify-content:flex-end}}
