@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>旅つづき 管理システム - システム管理</title><link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<header class="topbar"><div><strong>旅つづき</strong><span>システム管理</span></div>
+<div class="topbar-actions"><a class="secondary-link" href="admin-dashboard.html">地域選択へ戻る</a><button id="logoutButton" class="secondary-button" type="button">ログアウト</button></div></header>
+<main class="dashboard management"><h1>システム管理</h1>
+<p id="managementMessage" class="message" role="status" aria-live="polite">管理者権限を確認しています...</p>
+<section class="panel"><h2>地域管理</h2>
+<form id="regionForm" class="inline-form">
+<div><label for="regionName">地域名</label><input id="regionName" maxlength="100" required placeholder="例：東近江市"></div>
+<div><label for="regionSlug">地域ID（半角英小文字・数字・ハイフン）</label><input id="regionSlug" maxlength="80" pattern="[a-z0-9][a-z0-9-]*" required placeholder="例：higashiomi"></div>
+<button type="submit">地域を追加</button></form><div id="regionsList" class="management-list"></div></section>
+<section class="panel"><h2>ユーザー管理</h2>
+<p class="help-text">新しいユーザーのAuthアカウント作成は、現段階ではSupabaseのAuthentication画面で行います。作成後、この画面で有効化と地域割り当てを行えます。</p>
+<div id="usersList" class="management-list"></div></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="admin-auth.js"></script>
+</body></html>
