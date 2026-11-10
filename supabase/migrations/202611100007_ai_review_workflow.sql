@@ -41,12 +41,13 @@ grant select on public.spot_import_merged_v2 to authenticated;
 create or replace function public.save_spot_import_review(p_candidate_id uuid,p_reviewed_data jsonb)
 returns void language plpgsql security definer set search_path=''
 as $$
-declare v_region uuid;
+declare v_region uuid; v_status text; v_decision text;
 begin
   if auth.uid() is null then raise exception 'ログインが必要です'; end if;
   if p_reviewed_data is null or jsonb_typeof(p_reviewed_data)<>'object' then raise exception '審査内容の形式が正しくありません'; end if;
-  select j.region_id into v_region from public.spot_import_merged_v2 m join public.spot_import_jobs j on j.id=m.job_id where m.id=p_candidate_id;
+  select j.region_id,m.status,m.merged_data->>'decision' into v_region,v_status,v_decision from public.spot_import_merged_v2 m join public.spot_import_jobs j on j.id=m.job_id where m.id=p_candidate_id;
   if not found then raise exception '審査候補が見つかりません'; end if;
+  if v_status<>'completed' or v_decision<>'accepted' then raise exception 'この候補は審査対象ではありません'; end if;
   if not (private.is_system_admin() or private.has_region_access(v_region)) then raise exception 'この地域の審査権限がありません'; end if;
   if length(coalesce(p_reviewed_data->>'name','')) not between 1 and 100 then raise exception 'スポット名は1〜100文字で入力してください'; end if;
   if length(coalesce(p_reviewed_data->>'address',''))>200 then raise exception '住所は200文字以内で入力してください'; end if;
@@ -62,11 +63,12 @@ $$;
 create or replace function public.reject_spot_import_review(p_candidate_id uuid)
 returns void language plpgsql security definer set search_path=''
 as $$
-declare v_region uuid;
+declare v_region uuid; v_status text; v_decision text;
 begin
   if auth.uid() is null then raise exception 'ログインが必要です'; end if;
-  select j.region_id into v_region from public.spot_import_merged_v2 m join public.spot_import_jobs j on j.id=m.job_id where m.id=p_candidate_id;
+  select j.region_id,m.status,m.merged_data->>'decision' into v_region,v_status,v_decision from public.spot_import_merged_v2 m join public.spot_import_jobs j on j.id=m.job_id where m.id=p_candidate_id;
   if not found then raise exception '審査候補が見つかりません'; end if;
+  if v_status<>'completed' or v_decision<>'accepted' then raise exception 'この候補は審査対象ではありません'; end if;
   if not (private.is_system_admin() or private.has_region_access(v_region)) then raise exception 'この地域の審査権限がありません'; end if;
   update public.spot_import_merged_v2 set review_status='rejected',reviewed_by=auth.uid(),reviewed_at=now(),updated_at=now()
   where id=p_candidate_id and review_status='pending';
@@ -82,6 +84,7 @@ begin
   if auth.uid() is null then raise exception 'ログインが必要です'; end if;
   select * into v_candidate from public.spot_import_merged_v2 where id=p_candidate_id for update;
   if not found then raise exception '審査候補が見つかりません'; end if;
+  if v_candidate.status<>'completed' or v_candidate.merged_data->>'decision'<>'accepted' then raise exception 'この候補は審査対象ではありません'; end if;
   if v_candidate.review_status<>'pending' then raise exception 'この候補は別の担当者によって処理済みです。画面を更新してください'; end if;
   select region_id into v_region from public.spot_import_jobs where id=v_candidate.job_id;
   if not found then raise exception '元の収集ジョブが見つかりません'; end if;
