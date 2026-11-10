@@ -160,6 +160,19 @@ async function refreshManagement() {
     const actions=document.createElement("div");
     if(person.id!==managementUserId){const toggle=document.createElement("button");toggle.className="secondary-button";toggle.textContent=person.is_active?"無効にする":"有効にする";toggle.addEventListener("click",async()=>{toggle.disabled=true;const {error}=await adminSupabase.from("user_profiles").update({is_active:!person.is_active,updated_at:new Date().toISOString()}).eq("id",person.id);if(error)message.textContent=error.message.includes("最後の有効な")?error.message:"ユーザー状態を変更できませんでした。";else message.textContent="ユーザー状態を更新しました。";await refreshManagement();});actions.append(toggle);}
     else {const self=document.createElement("span");self.className="status-text";self.textContent="現在ログイン中";actions.append(self);}
+    if(person.id!==managementUserId){
+      const role=document.createElement("button");role.className="secondary-button";
+      role.textContent=person.is_system_admin?"管理者権限を解除":"管理者にする";
+      role.addEventListener("click",async()=>{
+        if(!window.confirm(person.is_system_admin?"このユーザーのシステム管理者権限を解除しますか？":"このユーザーにシステム管理者権限を付与しますか？"))return;
+        role.disabled=true;
+        const {error}=await adminSupabase.from("user_profiles").update({is_system_admin:!person.is_system_admin,updated_at:new Date().toISOString()}).eq("id",person.id);
+        if(error)message.textContent=error.message.includes("最後の有効な")?error.message:"管理者権限を変更できませんでした。";
+        else message.textContent="管理者権限を更新しました。";
+        await refreshManagement();
+      });
+      actions.append(role);
+    }
     const assignment=document.createElement("div");assignment.className="assignment-controls";
     const select=document.createElement("select");select.setAttribute("aria-label","割り当てる地域");select.add(new Option("地域を選択",""));
     regions.filter(r=>r.is_active).forEach(r=>select.add(new Option(r.name,r.id)));
