@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>旅つづき 管理システム</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <strong>旅つづき</strong>
+      <span>地域観光管理システム</span>
+    </div>
+    <button id="logoutButton" class="secondary-button" type="button">ログアウト</button>
+  </header>
+  <main class="dashboard">
+    <h1>担当地域を選択</h1>
+    <p id="welcomeMessage" class="subtitle">ログイン情報を確認しています...</p>
+    <section class="panel">
+      <label for="regionSelect">担当地域</label>
+      <select id="regionSelect">
+        <option value="">地域を読み込んでいます...</option>
+      </select>
+      <button id="openRegionButton" type="button" disabled>この地域で業務を開始</button>
+      <p id="dashboardMessage" class="message" role="status" aria-live="polite"></p>
+    </section>
+    <section id="regionWorkspace" class="panel hidden">
+      <h2 id="selectedRegionTitle"></h2>
+      <p>地域の業務画面は次の実装段階で追加します。</p>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin-auth.js"></script>
+</body>
+</html>
