@@ -44,3 +44,19 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .address-row{display:flex;gap:8px}.address-row input{flex:1}.address-results{display:grid;gap:6px;margin-top:8px}.address-results button{background:#f0f5f1;color:#294b39;text-align:left;font-weight:400}
 .form-error{color:#a12626;min-height:1.4em}.form-actions{justify-content:flex-start;margin-top:18px}.empty-state{color:#687970;padding:18px 0}
 @media(max-width:700px){.spot-heading,.spot-row{align-items:stretch;flex-direction:column}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.list-toolbar{align-items:stretch;flex-direction:column}.list-toolbar input{max-width:none}.address-row{flex-direction:column}}
+
+.spot-heading-actions{display:flex;align-items:center;gap:14px}
+.review-admin{max-width:1100px;margin:34px auto}
+.review-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:18px;align-items:start}
+.review-candidate-list{display:grid;gap:8px}
+.review-candidate{padding:12px;border:1px solid #dce6df;border-radius:8px;background:#fff;text-align:left;color:#24372c}
+.review-candidate[aria-current="true"]{border-color:#3e7859;background:#f0f6f1}
+.review-candidate small{display:block;color:#687970;margin-top:4px}
+.review-editor .panel{margin-bottom:16px}
+.review-source{padding:10px 0;border-bottom:1px solid #e5ece7}
+.review-source a{overflow-wrap:anywhere}
+.review-meta{color:#687970;font-size:13px}
+.review-action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.review-action-row button{min-height:42px}
+.review-decision{padding:12px;background:#f4f7f5;border-radius:7px;white-space:pre-wrap;line-height:1.6}
+@media(max-width:800px){.review-layout{grid-template-columns:1fr}.spot-heading-actions{flex-wrap:wrap}}
