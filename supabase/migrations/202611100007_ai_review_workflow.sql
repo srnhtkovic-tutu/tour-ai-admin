@@ -6,7 +6,25 @@ alter table public.spot_import_merged_v2
   add column if not exists reviewed_data jsonb,
   add column if not exists reviewed_by uuid references auth.users(id) on delete set null,
   add column if not exists reviewed_at timestamptz,
-  add column if not exists approved_spot_id bigint;
+  add column if not exists approved_spot_id bigint,
+  add column if not exists region_id uuid references public.regions(id) on delete set null;
+
+update public.spot_import_merged_v2 m
+set region_id=j.region_id
+from public.spot_import_jobs j
+where j.id=m.job_id and m.region_id is distinct from j.region_id;
+
+create or replace function private.set_merged_candidate_region()
+returns trigger language plpgsql security definer set search_path=''
+as $
+begin
+  select j.region_id into new.region_id from public.spot_import_jobs j where j.id=new.job_id;
+  return new;
+end;
+$;
+revoke all on function private.set_merged_candidate_region() from public,anon,authenticated;
+drop trigger if exists set_merged_candidate_region on public.spot_import_merged_v2;
+create trigger set_merged_candidate_region before insert or update of job_id on public.spot_import_merged_v2 for each row execute function private.set_merged_candidate_region();
 
 alter table public.spot_import_merged_v2
   drop constraint if exists spot_import_merged_v2_review_status_check;
@@ -17,13 +35,7 @@ alter table public.spot_import_merged_v2
 drop policy if exists merged_v2_select_region_review on public.spot_import_merged_v2;
 create policy merged_v2_select_region_review
 on public.spot_import_merged_v2 for select to authenticated
-using (
-  exists (
-    select 1 from public.spot_import_jobs j
-    where j.id=spot_import_merged_v2.job_id
-      and (private.is_system_admin() or private.has_region_access(j.region_id))
-  )
-);
+using (private.is_system_admin() or private.has_region_access(region_id));
 grant select on public.spot_import_merged_v2 to authenticated;
 
 create or replace function public.save_spot_import_review(p_candidate_id uuid,p_reviewed_data jsonb)
