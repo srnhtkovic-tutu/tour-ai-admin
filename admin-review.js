@@ -51,6 +51,7 @@ async function loadReviewCandidates() {
   }
   reviewCandidates.forEach(candidate=>{
     const button=document.createElement("button");button.type="button";button.className="review-candidate";
+    button.dataset.candidateId=candidate.id;
     button.setAttribute("aria-current",candidate.id===selectedReviewId?"true":"false");
     const title=document.createElement("strong");title.textContent=candidate.spot_name;
     const meta=document.createElement("small");meta.textContent="情報元 "+(candidate.source_count||0)+"件";
@@ -73,7 +74,7 @@ function renderCandidate(id) {
   const candidate=reviewCandidates.find(c=>c.id===id);
   if(!candidate)return;
   selectedReviewId=id;
-  candidateList.querySelectorAll("button").forEach(b=>b.setAttribute("aria-current",b.querySelector("strong")?.textContent===candidate.spot_name?"true":"false"));
+  candidateList.querySelectorAll("button").forEach(b=>b.setAttribute("aria-current",b.dataset.candidateId===candidate.id?"true":"false"));
   reviewEditor.replaceChildren();
 
   const ai=candidate.merged_data||{};
@@ -88,12 +89,13 @@ function renderCandidate(id) {
     sourcePanel.append(element("h3","収集したページ"));
     sources.forEach(source=>{
       const wrap=element("div",null,"review-source");
-      const title=source.title||source.name||source.url||"情報元ページ";
+      const title=source.page_title||source.title||source.name||source.url||"情報元ページ";
       const url=source.url||source.source_url;
       if(url && /^https?:\/\//i.test(url)){
         const link=element("a",title);link.href=url;link.target="_blank";link.rel="noopener noreferrer";wrap.append(link);
       } else wrap.append(element("span",title));
-      if(source.relevance_class)wrap.append(element("div","関連度 "+source.relevance_class+" "+(source.relevance_reason||""),"review-meta"));
+      if(source.relevance_class)wrap.append(element("div","関連度 "+source.relevance_class,"review-meta"));
+      if(source.relevance_reason)wrap.append(element("p",source.relevance_reason,"review-meta"));
       if(source.relevant_information)wrap.append(element("p",source.relevant_information));
       sourcePanel.append(wrap);
     });
