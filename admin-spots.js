@@ -143,9 +143,10 @@ async function saveSpot(event) {
   if ((lat===null)!==(lng===null)) { errorBox.textContent="緯度と経度は両方入力してください。"; return; }
   if (lat!==null && (lat < -90 || lat > 90 || lng < -180 || lng > 180)) { errorBox.textContent="緯度・経度の範囲が正しくありません。"; return; }
 
+  const isNewSpot = editingSpotId===null;
   button.disabled=true; button.textContent="保存しています...";
   let result;
-  if (editingSpotId===null) {
+  if (isNewSpot) {
     result=await adminSupabase.rpc("create_region_spot",{p_region_id:spotRegionId,p_name:name,p_address:address||null,p_lat:lat,p_lng:lng,p_guide_data:guide});
   } else {
     result=await adminSupabase.rpc("update_region_spot",{p_spot_id:editingSpotId,p_name:name,p_address:address||null,p_lat:lat,p_lng:lng,p_guide_data:guide});
@@ -156,7 +157,7 @@ async function saveSpot(event) {
     return;
   }
   closeSpotEditor();
-  spotMessage.textContent=editingSpotId===null?"スポットを登録しました":"スポットを更新しました";
+  spotMessage.textContent=isNewSpot?"スポットを登録しました":"スポットを更新しました";
   await loadSpotList();
 }
 
