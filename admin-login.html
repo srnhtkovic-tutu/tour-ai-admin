@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>旅つづき 管理システム - ログイン</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body class="auth-page">
+  <main class="auth-card">
+    <h1>旅つづき</h1>
+    <p class="subtitle">地域観光管理システム</p>
+    <h2>ログイン</h2>
+    <form id="loginForm">
+      <label for="email">メールアドレス</label>
+      <input id="email" name="email" type="email" autocomplete="username" required>
+      <label for="password">パスワード</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button id="loginButton" type="submit">ログイン</button>
+    </form>
+    <p id="authMessage" class="message" role="status" aria-live="polite"></p>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="admin-auth.js"></script>
+</body>
+</html>
