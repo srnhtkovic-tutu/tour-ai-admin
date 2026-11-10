@@ -63,6 +63,7 @@ async function initializeDashboard() {
 
   document.getElementById("welcomeMessage").textContent =
     profile.display_name ? profile.display_name + " さん" : user.email;
+  if (profile.is_system_admin) document.getElementById("adminSettingsLink")?.classList.remove("hidden");
 
   const { data: regions, error: regionError } = await adminSupabase
     .from("regions")
@@ -102,5 +103,69 @@ if (logoutButton) {
   logoutButton.addEventListener("click", async () => {
     await adminSupabase.auth.signOut();
     window.location.replace("admin-login.html");
+  });
+}
+
+
+let managementUserId = null;
+if (document.getElementById("usersList")) initializeManagement();
+
+async function initializeManagement() {
+  const message = document.getElementById("managementMessage");
+  const { data: sessionData } = await adminSupabase.auth.getSession();
+  if (!sessionData.session) { window.location.replace("admin-login.html"); return; }
+  managementUserId = sessionData.session.user.id;
+  const { data: profile, error } = await adminSupabase.from("user_profiles")
+    .select("is_active,is_system_admin").eq("id", managementUserId).maybeSingle();
+  if (error || !profile || !profile.is_active || !profile.is_system_admin) {
+    message.textContent = "この画面を利用する権限がありません。"; return;
+  }
+  message.textContent = "システム管理者としてログインしています。";
+  await refreshManagement();
+  document.getElementById("regionForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button"); button.disabled = true;
+    const name = document.getElementById("regionName").value.trim();
+    const slug = document.getElementById("regionSlug").value.trim();
+    const { error } = await adminSupabase.from("regions").insert({ name, slug });
+    button.disabled = false;
+    if (error) { message.textContent = "地域を追加できませんでした。地域IDの重複などをご確認ください。"; return; }
+    event.currentTarget.reset(); message.textContent = "地域を追加しました。"; await refreshManagement();
+  });
+}
+
+async function refreshManagement() {
+  const message = document.getElementById("managementMessage");
+  const [rr, ur, ar] = await Promise.all([
+    adminSupabase.from("regions").select("id,name,slug,is_active").order("name"),
+    adminSupabase.from("user_profiles").select("id,email,display_name,is_active,is_system_admin").order("created_at"),
+    adminSupabase.from("user_regions").select("user_id,region_id")
+  ]);
+  if (rr.error || ur.error || ar.error) { message.textContent = "管理情報を読み込めませんでした。権限設定をご確認ください。"; return; }
+  const regions=rr.data||[], users=ur.data||[], assignments=ar.data||[];
+  const regionsList=document.getElementById("regionsList"); regionsList.replaceChildren();
+  regions.forEach((region)=>{
+    const row=document.createElement("div"); row.className="management-row";
+    const info=document.createElement("div"); const title=document.createElement("strong"); title.textContent=region.name;
+    const sub=document.createElement("div"); sub.className="status-text"; sub.textContent=region.slug+" ・ "+(region.is_active?"有効":"無効"); info.append(title,sub);
+    const toggle=document.createElement("button"); toggle.className="secondary-button"; toggle.textContent=region.is_active?"無効にする":"再有効化";
+    toggle.addEventListener("click",async()=>{toggle.disabled=true;const {error}=await adminSupabase.from("regions").update({is_active:!region.is_active,updated_at:new Date().toISOString()}).eq("id",region.id);if(error)message.textContent="地域の状態を変更できませんでした。";else{message.textContent="地域の状態を更新しました。";await refreshManagement();}});
+    row.append(info,toggle); regionsList.append(row);
+  });
+  const usersList=document.getElementById("usersList"); usersList.replaceChildren();
+  users.forEach((person)=>{
+    const row=document.createElement("div"); row.className="management-row user-row";
+    const info=document.createElement("div"); const title=document.createElement("strong"); title.textContent=person.display_name||person.email||person.id;
+    const sub=document.createElement("div"); sub.className="status-text"; sub.textContent=(person.email||"")+" ・ "+(person.is_system_admin?"システム管理者":"一般ユーザー")+" ・ "+(person.is_active?"有効":"無効"); info.append(title,sub);
+    const actions=document.createElement("div");
+    if(person.id!==managementUserId){const toggle=document.createElement("button");toggle.className="secondary-button";toggle.textContent=person.is_active?"無効にする":"有効にする";toggle.addEventListener("click",async()=>{toggle.disabled=true;const {error}=await adminSupabase.from("user_profiles").update({is_active:!person.is_active,updated_at:new Date().toISOString()}).eq("id",person.id);if(error)message.textContent=error.message.includes("最後の有効な")?error.message:"ユーザー状態を変更できませんでした。";else message.textContent="ユーザー状態を更新しました。";await refreshManagement();});actions.append(toggle);}
+    else {const self=document.createElement("span");self.className="status-text";self.textContent="現在ログイン中";actions.append(self);}
+    const assignment=document.createElement("div");assignment.className="assignment-controls";
+    const select=document.createElement("select");select.setAttribute("aria-label","割り当てる地域");select.add(new Option("地域を選択",""));
+    regions.filter(r=>r.is_active).forEach(r=>select.add(new Option(r.name,r.id)));
+    const assign=document.createElement("button");assign.textContent="割り当て";assign.addEventListener("click",async()=>{if(!select.value)return;assign.disabled=true;const {error}=await adminSupabase.from("user_regions").insert({user_id:person.id,region_id:select.value});if(error&&error.code!=="23505")message.textContent="地域を割り当てられませんでした。";else message.textContent="地域を割り当てました。";await refreshManagement();});assignment.append(select,assign);
+    const assigned=document.createElement("div");assigned.className="assigned-regions";
+    assignments.filter(a=>a.user_id===person.id).forEach(a=>{const region=regions.find(r=>r.id===a.region_id);if(!region)return;const remove=document.createElement("button");remove.className="secondary-button";remove.textContent=region.name+" ×";remove.title="地域割り当てを解除";remove.addEventListener("click",async()=>{remove.disabled=true;const {error}=await adminSupabase.from("user_regions").delete().eq("user_id",person.id).eq("region_id",region.id);if(error)message.textContent="地域割り当てを解除できませんでした。";else message.textContent="地域割り当てを解除しました。";await refreshManagement();});assigned.append(remove);});
+    row.append(info,actions,assignment,assigned);usersList.append(row);
   });
 }
