@@ -92,9 +92,7 @@ async function initializeDashboard() {
   openButton.addEventListener("click", () => {
     const region = regions.find((item) => item.id === regionSelect.value);
     if (!region) return;
-    document.getElementById("selectedRegionTitle").textContent = region.name;
-    document.getElementById("regionWorkspace").classList.remove("hidden");
-    message.textContent = "選択した地域: " + region.name;
+    window.location.href = "admin-spots.html?region=" + encodeURIComponent(region.id);
   });
 }
 
