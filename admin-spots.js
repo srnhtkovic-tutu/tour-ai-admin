@@ -1,0 +1,1 @@
+// Spot management logic is added in the next commit.
