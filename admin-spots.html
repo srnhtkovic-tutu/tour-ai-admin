@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>旅つづき - スポット管理</title><link rel="stylesheet" href="admin.css"></head>
+<body>
+<header class="topbar"><div><strong>旅つづき</strong><span id="regionNameHeader">スポット管理</span></div>
+<div class="topbar-actions"><a class="secondary-link" href="admin-dashboard.html">地域選択へ戻る</a><button id="logoutButton" class="secondary-button" type="button">ログアウト</button></div></header>
+<main class="dashboard spot-admin">
+<div class="spot-heading"><div><h1>スポット管理</h1><p id="spotMessage" class="message" role="status" aria-live="polite">地域情報を確認しています...</p></div><button id="newSpotButton" type="button">新しいスポットを登録</button></div>
+<section class="panel"><div class="list-toolbar"><input id="spotSearch" type="search" placeholder="スポット名で検索"><button id="searchButton" class="secondary-button" type="button">検索</button></div><div id="spotsList" class="spots-list"></div></section>
+<section id="spotEditor" class="panel hidden">
+<div class="editor-heading"><h2 id="editorTitle">スポット登録</h2><button id="cancelEditorButton" class="secondary-button" type="button">閉じる</button></div>
+<form id="spotForm">
+<div class="form-grid">
+<div class="field full"><label for="spotName">スポット名（必須・100文字以内）</label><input id="spotName" maxlength="100" required></div>
+<div class="field full"><label for="spotAddress">住所（任意・200文字以内）</label><div class="address-row"><input id="spotAddress" maxlength="200"><button id="lookupAddressButton" class="secondary-button" type="button">住所を検索</button></div><div id="addressResults" class="address-results"></div></div>
+<div class="field"><label for="spotLat">緯度</label><input id="spotLat" type="number" step="any" min="-90" max="90"></div>
+<div class="field"><label for="spotLng">経度</label><input id="spotLng" type="number" step="any" min="-180" max="180"></div>
+<div class="field full"><label for="officialUrl">公式サイトURL（2000文字以内）</label><input id="officialUrl" type="url" maxlength="2000"></div>
+<div class="field full"><label for="catchCopy">キャッチコピー</label><textarea id="catchCopy" maxlength="2000" rows="2"></textarea></div>
+<div class="field full"><label for="topReason">おすすめする理由</label><textarea id="topReason" maxlength="2000" rows="3"></textarea></div>
+<div class="field full"><label for="highlightPoints">見どころ（1行に1項目）</label><textarea id="highlightPoints" rows="3"></textarea></div>
+<div class="field"><label for="tags">タグ（1行に1項目）</label><textarea id="tags" rows="3"></textarea></div>
+<div class="field"><label for="bestSeason">おすすめの季節</label><textarea id="bestSeason" maxlength="2000" rows="3"></textarea></div>
+<div class="field full"><label for="latestTopics">最近の話題</label><textarea id="latestTopics" maxlength="2000" rows="3"></textarea></div>
+<div class="field"><label for="recommendFood">グルメ</label><textarea id="recommendFood" maxlength="2000" rows="3"></textarea></div>
+<div class="field"><label for="recommendHistory">歴史・文化</label><textarea id="recommendHistory" maxlength="2000" rows="3"></textarea></div>
+<div class="field"><label for="recommendRelax">癒やし</label><textarea id="recommendRelax" maxlength="2000" rows="3"></textarea></div>
+<div class="field"><label for="recommendActivity">自然・体験</label><textarea id="recommendActivity" maxlength="2000" rows="3"></textarea></div>
+<div class="field full"><label for="localRecommendation">地元の人からのおすすめ</label><textarea id="localRecommendation" maxlength="2000" rows="3"></textarea></div>
+</div>
+<p id="formError" class="form-error" role="alert"></p>
+<div class="form-actions"><button id="saveSpotButton" type="submit">保存する</button><button id="discardSpotButton" class="secondary-button" type="button">キャンセル</button></div>
+</form></section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="admin-auth.js"></script><script src="admin-spots.js"></script>
+</body></html>
