@@ -38,8 +38,8 @@ async function loadReviewCandidates() {
   reviewMessage.textContent="審査候補を読み込んでいます...";
   candidateList.replaceChildren();
   const {data,error}=await adminSupabase.from("spot_import_merged_v2")
-    .select("id,job_id,spot_name,status,source_count,sources,merged_data,reviewed_data,review_status,relevance_results,created_at,spot_import_jobs!inner(region_id)")
-    .eq("spot_import_jobs.region_id",reviewRegionId)
+    .select("id,job_id,region_id,spot_name,status,source_count,sources,merged_data,reviewed_data,review_status,relevance_results,created_at")
+    .eq("region_id",reviewRegionId)
     .eq("status","completed").eq("review_status","pending")
     .order("created_at",{ascending:false});
   if(error){reviewMessage.textContent="審査候補を読み込めませんでした。DB権限を確認してください。";console.error(error);return;}
