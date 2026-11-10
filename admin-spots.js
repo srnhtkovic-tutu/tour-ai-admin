@@ -38,6 +38,7 @@ async function initializeSpotManagement() {
   }
   spotRegionName = region.name;
   document.getElementById("regionNameHeader").textContent = region.name;
+  document.getElementById("reviewCandidatesLink").href = "admin-review.html?region=" + encodeURIComponent(spotRegionId);
   spotMessage.textContent = region.name + " のスポットを管理します。";
   document.getElementById("newSpotButton").addEventListener("click", () => openSpotEditor(null));
   document.getElementById("cancelEditorButton").addEventListener("click", closeSpotEditor);
