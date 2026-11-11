@@ -223,6 +223,7 @@ if (resetPasswordForm) {
       return;
     }
     message.textContent = "新しいパスワードを入力してください。";
+    updateButton.disabled = false;
   });
 
   resetPasswordForm.addEventListener("submit", async (event) => {
