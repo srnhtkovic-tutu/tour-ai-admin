@@ -180,3 +180,86 @@ async function refreshManagement() {
     row.append(info,actions,assignment,assigned);usersList.append(row);
   });
 }
+
+
+// Password recovery request from the login page.
+const resetPasswordButton = document.getElementById("resetPasswordButton");
+if (resetPasswordButton) {
+  resetPasswordButton.addEventListener("click", async () => {
+    const email = document.getElementById("email").value.trim();
+    const message = document.getElementById("authMessage");
+    if (!email) {
+      message.textContent = "先にメールアドレスを入力してください。";
+      document.getElementById("email").focus();
+      return;
+    }
+
+    resetPasswordButton.disabled = true;
+    message.textContent = "再設定メールを送信しています...";
+    const redirectTo = new URL("admin-reset-password.html", window.location.href).toString();
+    const { error } = await adminSupabase.auth.resetPasswordForEmail(email, { redirectTo });
+
+    if (error) {
+      message.textContent = "メールを送信できませんでした。時間をおいて再度お試しください。";
+      resetPasswordButton.disabled = false;
+      return;
+    }
+
+    message.textContent = "該当するアカウントがある場合、パスワード再設定メールを送信しました。メールをご確認ください。";
+    resetPasswordButton.disabled = false;
+  });
+}
+
+// Password update after the user opens the recovery link.
+const resetPasswordForm = document.getElementById("resetPasswordForm");
+if (resetPasswordForm) {
+  const message = document.getElementById("resetPasswordMessage");
+  const updateButton = document.getElementById("updatePasswordButton");
+
+  adminSupabase.auth.getSession().then(({ data, error }) => {
+    if (error || !data.session) {
+      message.textContent = "再設定リンクが無効か、有効期限が切れています。ログイン画面から再度メールを送信してください。";
+      updateButton.disabled = true;
+      return;
+    }
+    message.textContent = "新しいパスワードを入力してください。";
+  });
+
+  resetPasswordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const password = document.getElementById("newPassword").value;
+    const confirmation = document.getElementById("confirmPassword").value;
+
+    if (password.length < 8) {
+      message.textContent = "パスワードは8文字以上で入力してください。";
+      return;
+    }
+    if (password !== confirmation) {
+      message.textContent = "2つのパスワードが一致していません。";
+      return;
+    }
+
+    updateButton.disabled = true;
+    message.textContent = "パスワードを更新しています...";
+    const { data: sessionData, error: sessionError } = await adminSupabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      message.textContent = "再設定セッションを確認できません。ログイン画面から再度メールを送信してください。";
+      updateButton.disabled = false;
+      return;
+    }
+
+    const { error } = await adminSupabase.auth.updateUser({ password });
+    if (error) {
+      message.textContent = "パスワードを更新できませんでした。入力内容をご確認ください。";
+      updateButton.disabled = false;
+      return;
+    }
+
+    await adminSupabase.auth.signOut();
+    window.location.replace("admin-login.html?password-updated=1");
+  });
+}
+
+if (loginForm && new URLSearchParams(window.location.search).get("password-updated") === "1") {
+  authMessage.textContent = "パスワードを更新しました。新しいパスワードでログインしてください。";
+}
