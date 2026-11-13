@@ -150,13 +150,17 @@ function renderCandidate(id) {
   const approve=element("button","承認して本番登録");approve.type="button";approve.addEventListener("click",()=>approveReview(candidate.id,form,error,approve));
   const reject=element("button","不採用にする","secondary-button");reject.type="button";reject.addEventListener("click",()=>rejectReview(candidate));
   actions.append(save,approve,reject);form.append(actions);panel.append(form);reviewEditor.append(panel);
-  initializeReviewMap(base.lat??ai.lat??null,base.lng??ai.lng??null);
+  initializeReviewMap(
+    Object.prototype.hasOwnProperty.call(base,"lat")?base.lat:(ai.lat??null),
+    Object.prototype.hasOwnProperty.call(base,"lng")?base.lng:(ai.lng??null)
+  );
 }
 
 let reviewMap=null;
 let reviewMapMarker=null;
 
 function initializeReviewMap(initialLat,initialLng){
+  reviewMap=null;reviewMapMarker=null;
   const mapStatus=document.getElementById("reviewMapStatus");
   const mapElement=document.getElementById("reviewLocationMap");
   if(!mapElement||!window.L){if(mapStatus)mapStatus.textContent="地図ライブラリを読み込めませんでした。緯度・経度を直接入力してください。";return;}
