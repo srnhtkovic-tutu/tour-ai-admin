@@ -65,3 +65,11 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 /* Authentication recovery screens */
 #resetPasswordButton, #updatePasswordButton { width: 100%; margin-top: 12px; }
 #resetPasswordButton { background: #e8efea; color: #294b39; }
+
+
+/* AI review location picker */
+.review-map-panel{margin:18px 0 22px;padding:16px;border:1px solid #dce5df;border-radius:8px;background:#f8faf8}
+.review-map-panel h3{margin:0 0 8px;font-size:17px}
+.review-map-panel p{margin:6px 0 10px}
+.review-location-map{width:100%;height:380px;border:1px solid #cbd6ce;border-radius:7px;z-index:0}
+@media(max-width:600px){.review-location-map{height:320px}}
