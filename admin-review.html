@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>旅つづき - AI審査</title><link rel="stylesheet" href="admin.css"></head>
+<html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>旅つづき - AI審査</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="admin.css"></head>
 <body>
 <header class="topbar"><div><strong>旅つづき</strong><span id="reviewRegionHeader">AI審査</span></div><div class="topbar-actions"><a class="secondary-link" id="backToSpots" href="#">スポット管理へ戻る</a><button id="logoutButton" class="secondary-button" type="button">ログアウト</button></div></header>
 <main class="dashboard review-admin">
@@ -7,5 +7,5 @@
 <div class="review-layout"><aside class="panel"><h2>審査待ち一覧</h2><div id="reviewCandidateList" class="review-candidate-list"></div></aside>
 <section class="review-editor" id="reviewEditor"><div class="panel"><p class="empty-state">左側の候補を選択してください。</p></div></section></div>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="admin-auth.js"></script><script src="admin-review.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="admin-auth.js"></script><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="admin-review.js"></script>
 </body></html>
