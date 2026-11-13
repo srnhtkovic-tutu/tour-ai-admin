@@ -55,7 +55,7 @@ async function loadSpotList() {
   const search = document.getElementById("spotSearch").value.trim();
   spotMessage.textContent = "スポットを読み込んでいます...";
   let query = adminSupabase.from("spots")
-    .select("id,name,address,lat,lng,guide_data,create_at,updated_at")
+    .select("id,name,address,lat,lng,guide_data,geocoding_data,create_at,updated_at")
     .eq("region_id", spotRegionId).order("create_at", { ascending: false });
   if (search) query = query.ilike("name", "%" + search + "%");
   const { data, error } = await query;
@@ -74,6 +74,12 @@ async function loadSpotList() {
     const name=document.createElement("strong"); name.textContent=spot.name;
     const meta=document.createElement("small"); meta.textContent=spot.address || "住所未登録";
     info.append(name,meta);
+    if(spot.geocoding_data?.attribution){
+      const attribution=document.createElement("small");attribution.textContent=spot.geocoding_data.attribution;info.append(attribution);
+    }
+    if(spot.geocoding_data?.map_url&&/^https:\/\/qchizu\.jp\//i.test(spot.geocoding_data.map_url)){
+      const mapLink=document.createElement("a");mapLink.textContent="位置情報の出典地図";mapLink.href=spot.geocoding_data.map_url;mapLink.target="_blank";mapLink.rel="noopener noreferrer";info.append(mapLink);
+    }
     const actions=document.createElement("div"); actions.className="spot-actions";
     const edit=document.createElement("button"); edit.className="secondary-button"; edit.textContent="編集";
     edit.addEventListener("click",()=>openSpotEditor(spot));
