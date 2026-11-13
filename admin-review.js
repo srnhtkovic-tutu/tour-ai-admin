@@ -127,6 +127,11 @@ function renderCandidate(id) {
   const panel=element("section",null,"panel");
   panel.append(element("h2","内容の確認・編集"));
   const form=element("form");form.id="reviewForm";form._geocoding=geocoding;
+  const mapPanel=element("div",null,"review-map-panel");
+  mapPanel.append(element("h3","地図で位置を設定"));
+  mapPanel.append(element("p","地図をクリックすると、その場所にマーカーが移動して緯度・経度に反映されます。マーカーをドラッグして微調整することもできます。","review-meta"));
+  const mapNode=element("div",null,"review-location-map");mapNode.id="reviewLocationMap";mapPanel.append(mapNode);
+  const mapStatus=element("p","地図を読み込んでいます...","review-meta");mapStatus.id="reviewMapStatus";mapPanel.append(mapStatus);
   const grid=element("div",null,"form-grid");
   addField(grid,"reviewName","スポット名（必須・100文字以内）",base.name||candidate.spot_name,"text",100,true,true);
   addField(grid,"reviewAddress","住所（200文字以内）",base.address||"","text",200,true);
@@ -138,13 +143,62 @@ function renderCandidate(id) {
     const label=({catchCopy:"キャッチコピー",topReason:"おすすめする理由",highlightPoints:"見どころ（1行に1項目）",tags:"タグ（1行に1項目）",bestSeason:"おすすめの季節",latestTopics:"最近の話題",officialUrl:"公式サイトURL",recommendFood:"グルメ",recommendHistory:"歴史・文化",recommendRelax:"癒やし",recommendActivity:"自然・体験",localRecommendation:"地元の人からのおすすめ"})[key];
     addField(grid,"review_"+key,label,val,"textarea",key==="highlightPoints"||key==="tags"?null:2000,true,key==="catchCopy"||key==="topReason"||key==="highlightPoints"||key==="tags"||key==="localRecommendation");
   });
-  form.append(grid);
+  form.append(mapPanel,grid);
   const error=element("p","","form-error");error.id="reviewFormError";form.append(error);
   const actions=element("div",null,"review-action-row");
   const save=element("button","修正内容を保存");save.type="button";save.addEventListener("click",()=>saveReview(candidate.id,form,error,save));
   const approve=element("button","承認して本番登録");approve.type="button";approve.addEventListener("click",()=>approveReview(candidate.id,form,error,approve));
   const reject=element("button","不採用にする","secondary-button");reject.type="button";reject.addEventListener("click",()=>rejectReview(candidate));
   actions.append(save,approve,reject);form.append(actions);panel.append(form);reviewEditor.append(panel);
+  initializeReviewMap(base.lat??ai.lat??null,base.lng??ai.lng??null);
+}
+
+let reviewMap=null;
+let reviewMapMarker=null;
+
+function initializeReviewMap(initialLat,initialLng){
+  const mapStatus=document.getElementById("reviewMapStatus");
+  const mapElement=document.getElementById("reviewLocationMap");
+  if(!mapElement||!window.L){if(mapStatus)mapStatus.textContent="地図ライブラリを読み込めませんでした。緯度・経度を直接入力してください。";return;}
+  const hasInitial=Number.isFinite(Number(initialLat))&&initialLat!==null&&initialLat!==""&&Number.isFinite(Number(initialLng))&&initialLng!==null&&initialLng!=="";
+  const start=hasInitial?[Number(initialLat),Number(initialLng)]:[36.5,138.0];
+  reviewMap=L.map(mapElement).setView(start,hasInitial?16:5);
+  L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",{
+    maxZoom:18,
+    attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル（国土地理院）</a>'
+  }).addTo(reviewMap);
+  if(hasInitial)placeReviewMarker(start[0],start[1],false);
+  reviewMap.on("click",event=>{
+    placeReviewMarker(event.latlng.lat,event.latlng.lng,true);
+    if(mapStatus)mapStatus.textContent="地図で選択した位置を緯度・経度欄に反映しました。";
+  });
+  ["reviewLat","reviewLng"].forEach(id=>{
+    document.getElementById(id).addEventListener("change",()=>{
+      const lat=Number(document.getElementById("reviewLat").value);
+      const lng=Number(document.getElementById("reviewLng").value);
+      if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat < -90||lat>90||lng < -180||lng>180)return;
+      placeReviewMarker(lat,lng,false);
+      reviewMap.setView([lat,lng],Math.max(reviewMap.getZoom(),16));
+    });
+  });
+  setTimeout(()=>reviewMap.invalidateSize(),0);
+  if(mapStatus)mapStatus.textContent=hasInitial?"現在の登録候補位置を表示しています。地図をクリックして調整できます。":"位置が未設定です。地図を移動・拡大して、スポットの場所をクリックしてください。";
+}
+
+function placeReviewMarker(lat,lng,updateFields){
+  if(!reviewMap)return;
+  const position=[lat,lng];
+  if(!reviewMapMarker){
+    reviewMapMarker=L.marker(position,{draggable:true}).addTo(reviewMap);
+    reviewMapMarker.on("dragend",()=>{
+      const p=reviewMapMarker.getLatLng();
+      placeReviewMarker(p.lat,p.lng,true);
+    });
+  }else reviewMapMarker.setLatLng(position);
+  if(updateFields){
+    document.getElementById("reviewLat").value=lat.toFixed(7);
+    document.getElementById("reviewLng").value=lng.toFixed(7);
+  }
 }
 
 function addField(grid,id,label,value,type,maxLength,full=false,required=false){
