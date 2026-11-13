@@ -160,6 +160,7 @@ let reviewMap=null;
 let reviewMapMarker=null;
 
 function initializeReviewMap(initialLat,initialLng){
+  if(reviewMap)reviewMap.remove();
   reviewMap=null;reviewMapMarker=null;
   const mapStatus=document.getElementById("reviewMapStatus");
   const mapElement=document.getElementById("reviewLocationMap");
