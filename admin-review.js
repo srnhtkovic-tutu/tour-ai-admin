@@ -84,6 +84,20 @@ function renderCandidate(id) {
   sourcePanel.append(element("h2","AIによる判定・情報源"));
   sourcePanel.append(element("p","AI判定: "+(ai.decision||"未設定")+" ／ 情報元: "+(candidate.source_count||0)+"件","review-meta"));
   if(ai.decisionReason) sourcePanel.append(element("div",ai.decisionReason,"review-decision"));
+  const geocoding=base.geocoding||ai.geocoding||null;
+  if(geocoding){
+    const geoPanel=element("div",null,"review-source");
+    geoPanel.append(element("h3","住所からの位置情報"));
+    const statusLabel=geocoding.status==="resolved"?"自動取得済み（審査で位置を確認してください）":geocoding.status==="no_address"?"住所なし":geocoding.status==="error"?"住所検索サービスに接続できませんでした":"位置を特定できませんでした";
+    geoPanel.append(element("p",statusLabel,"review-meta"));
+    if(geocoding.reason)geoPanel.append(element("p",geocoding.reason,"review-meta"));
+    if(geocoding.coordinate_level)geoPanel.append(element("p","座標精度: "+geocoding.coordinate_level+" ／ 一致度: "+(geocoding.score??"不明"),"review-meta"));
+    if(geocoding.map_url&&/^https:\/\/qchizu\.jp\//i.test(geocoding.map_url)){
+      const mapLink=element("a","全国Q地図で位置を確認");mapLink.href=geocoding.map_url;mapLink.target="_blank";mapLink.rel="noopener noreferrer";geoPanel.append(mapLink);
+    }
+    if(geocoding.attribution)geoPanel.append(element("p",geocoding.attribution,"review-meta"));
+    sourcePanel.append(geoPanel);
+  }
   const sources=Array.isArray(candidate.sources)?candidate.sources:[];
   if(sources.length){
     sourcePanel.append(element("h3","収集したページ"));
@@ -112,7 +126,7 @@ function renderCandidate(id) {
 
   const panel=element("section",null,"panel");
   panel.append(element("h2","内容の確認・編集"));
-  const form=element("form");form.id="reviewForm";
+  const form=element("form");form.id="reviewForm";form._geocoding=geocoding;
   const grid=element("div",null,"form-grid");
   addField(grid,"reviewName","スポット名（必須・100文字以内）",base.name||candidate.spot_name,"text",100,true,true);
   addField(grid,"reviewAddress","住所（200文字以内）",base.address||"","text",200,true);
@@ -156,7 +170,11 @@ function collectReviewData(form){
     const value=form.querySelector("#review_"+key).value.trim();
     guide[key]=(key==="highlightPoints"||key==="tags")?(value?value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean):[]):value;
   });
-  return {name,address,lat:latText===""?null:Number(latText),lng:lngText===""?null:Number(lngText),guide_data:guide};
+  const lat=latText===""?null:Number(latText);
+  const lng=lngText===""?null:Number(lngText);
+  const geocoding=form._geocoding||null;
+  const sameAsGeocoding=!!geocoding&&geocoding.status==="resolved"&&lat===geocoding.lat&&lng===geocoding.lng;
+  return {name,address,lat,lng,guide_data:guide,geocoding,location_source:lat!==null&&lng!==null?(sameAsGeocoding?"全国Q地図":"manual_review"):null};
 }
 
 async function saveReview(id,form,error,button){
@@ -181,6 +199,7 @@ async function approveReview(id,form,error,button){
   if(!data.name||data.name.length>100){error.textContent="スポット名を1〜100文字で入力してください。";return;}
   if(data.address.length>200){error.textContent="住所は200文字以内で入力してください。";return;}
   if((data.lat===null)!==(data.lng===null)||(data.lat!==null&&(!Number.isFinite(data.lat)||!Number.isFinite(data.lng)||data.lat < -90||data.lat>90||data.lng < -180||data.lng>180))){error.textContent="緯度・経度を正しく入力してください。";return;}
+  if(data.lat===null||data.lng===null){error.textContent="位置情報が未設定です。緯度・経度を設定してから承認してください。";form.querySelector("#reviewLat").focus();return;}
   if(!window.confirm("「"+data.name+"」を承認し、本番スポットとして登録しますか？"))return;
   button.disabled=true;button.textContent="登録しています...";
   const {error:saveError}=await adminSupabase.rpc("save_spot_import_review",{p_candidate_id:id,p_reviewed_data:data});
