@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>旅つづき - 収集ジョブ管理</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<header class="topbar">
+  <div><strong>旅つづき</strong><span id="regionNameHeader">収集ジョブ管理</span></div>
+  <div class="topbar-actions">
+    <a class="secondary-link" id="backToSpotsLink" href="#">スポット管理へ戻る</a>
+    <button id="logoutButton" class="secondary-button" type="button">ログアウト</button>
+  </div>
+</header>
+<main class="dashboard job-admin">
+  <div class="spot-heading">
+    <div>
+      <h1>スポット収集ジョブ</h1>
+      <p id="jobMessage" class="message" role="status" aria-live="polite">地域情報を確認しています...</p>
+    </div>
+    <button id="refreshJobsButton" class="secondary-button" type="button">一覧を更新</button>
+  </div>
+
+  <section class="panel">
+    <h2>新しい収集ジョブを登録</h2>
+    <p class="help-text">登録すると、ジョブは開始指示付きで待機列に入り、Cron・Dispatcherが順次処理します。Workerを画面から直接起動することはありません。</p>
+    <form id="jobCreateForm">
+      <div class="field">
+        <label for="sourceUrl">収集元URL（HTTPS・必須）</label>
+        <input id="sourceUrl" type="url" inputmode="url" maxlength="2000" placeholder="https://example.jp/" required>
+      </div>
+      <div class="job-form-grid">
+        <div class="field">
+          <label for="maxFacilities">最大施設数</label>
+          <input id="maxFacilities" type="number" min="1" max="10000" value="1" required>
+          <small class="help-text">AI統合候補の上限です。サイトマップのURL収集件数の上限ではありません。</small>
+        </div>
+        <div class="field">
+          <label for="batchSize">バッチサイズ</label>
+          <input id="batchSize" type="number" min="1" max="1000" value="10" required>
+          <small class="help-text">1回の処理単位で扱う件数です。</small>
+        </div>
+      </div>
+      <p id="createJobError" class="form-error" role="alert"></p>
+      <div class="form-actions">
+        <button id="createJobButton" type="submit">収集ジョブを登録</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>登録済みジョブ</h2>
+    <p class="help-text">この地域の最新50件を表示します。実行履歴の詳細はシステム管理者専用です。</p>
+    <div id="jobList" class="job-list"><p class="empty-state">読み込み中...</p></div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="admin-auth.js"></script>
+<script src="admin-jobs.js"></script>
+</body>
+</html>
