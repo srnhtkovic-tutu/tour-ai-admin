@@ -73,3 +73,21 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .review-map-panel p{margin:6px 0 10px}
 .review-location-map{width:100%;height:380px;border:1px solid #cbd6ce;border-radius:7px;z-index:0}
 @media(max-width:600px){.review-location-map{height:320px}}
+
+
+/* Spot import job management */
+.job-admin{max-width:1100px;margin:34px auto}
+.job-admin h2{margin:0 0 12px}
+.job-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.job-list{display:grid;gap:12px;margin-top:16px}
+.job-card{padding:16px;border:1px solid #dce5df;border-radius:8px;background:#fff}
+.job-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;overflow-wrap:anywhere}
+.job-card-heading strong{font-weight:650}
+.job-status{flex:none;padding:4px 9px;border-radius:999px;background:#edf3ee;color:#294b39;font-size:13px}
+.job-meta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;color:#687970;font-size:13px}
+.job-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.job-actions button{min-height:38px;padding:7px 12px}
+.job-error{margin:12px 0 0;color:#a12626;white-space:pre-wrap;overflow-wrap:anywhere}
+.help-text{display:block;color:#687970;line-height:1.6;font-size:13px}
+.field small.help-text{margin-top:5px}
+@media(max-width:700px){.job-form-grid{grid-template-columns:1fr}.job-card-heading{flex-direction:column}}
