@@ -5,6 +5,7 @@ const createForm = document.getElementById("jobCreateForm");
 
 let jobRegionName = "";
 let jobPageReady = false;
+let jobIsSystemAdmin = false;
 
 initializeJobManagement();
 
@@ -31,6 +32,7 @@ async function initializeJobManagement() {
     jobMessage.textContent = "このアカウントでは業務画面を利用できません。";
     return;
   }
+  jobIsSystemAdmin = Boolean(profile.is_system_admin);
 
   const { data: region, error: regionError } = await adminSupabase
     .from("regions")
@@ -88,6 +90,22 @@ async function loadJobs() {
   const jobs = Array.isArray(data) ? data : [];
   jobMessage.textContent = jobRegionName + " ・ " + jobs.length + "件（最新50件）";
 
+  if (jobIsSystemAdmin) {
+    const { data: anomalyLock, error: anomalyError } = await adminSupabase.rpc(
+      "get_spot_import_anomaly_lock"
+    );
+    if (anomalyError) {
+      console.error("get_spot_import_anomaly_lock:", anomalyError);
+      jobList.append(makeText(
+        "p",
+        "システム異常ロックの状態を確認できませんでした。管理者権限と接続状態を確認してください。",
+        "job-error"
+      ));
+    } else if (anomalyLock?.lock_status === "anomaly") {
+      jobList.append(renderAnomalyLock(anomalyLock));
+    }
+  }
+
   if (jobs.length === 0) {
     jobList.append(makeText("p", "この地域に収集ジョブはありません。", "empty-state"));
     return;
@@ -142,6 +160,111 @@ function renderJob(job) {
 
   if (actions.childElementCount) card.append(actions);
   return card;
+}
+
+function renderAnomalyLock(lock) {
+  const panel = document.createElement("section");
+  panel.className = "job-anomaly";
+
+  const lockedJob = lock.job || {};
+  panel.append(makeText("strong", "システム異常ロックが発生しています"));
+  panel.append(makeText(
+    "p",
+    "対象URL：" + (lockedJob.source_url || "取得できません（ジョブID：" + lock.locked_job_id + "）")
+  ));
+  panel.append(makeText("p", "異常理由：" + (lock.anomaly_reason || "不明")));
+  panel.append(makeText(
+    "p",
+    "対象ジョブ状態：" + statusLabel(lockedJob.status) +
+    " ・ 工程：" + stageLabel(lockedJob.current_stage)
+  ));
+  panel.append(makeText(
+    "p",
+    "ロック取得：" + formatDate(lock.lock_acquired_at) +
+    " ・ 最終Heartbeat：" + formatDate(lock.last_heartbeat_at) +
+    " ・ lease期限：" + formatDate(lock.lock_expires_at)
+  ));
+  panel.append(makeText("small", "対象ジョブID：" + (lock.locked_job_id || "不明")));
+
+  let releaseButton;
+  releaseButton = makeActionButton(
+    "異常ロックを解除",
+    () => releaseAnomalyLock(lock, releaseButton),
+    "secondary-button"
+  );
+  panel.append(releaseButton);
+  return panel;
+}
+
+async function releaseAnomalyLock(lock, button) {
+  if (!jobIsSystemAdmin || !lock?.locked_job_id) return;
+
+  const confirmed = window.confirm(
+    "異常ロックを解除します。\n\n" +
+    "実行前に、古いWorkerが停止していることをログ等で確認してください。\n" +
+    "解除後、対象ジョブは一時停止状態になります。\n" +
+    "ジョブの再開は別操作です。取得済みデータはリセットされません。\n\n" +
+    "古いWorkerが停止していることを確認しましたか？"
+  );
+  if (!confirmed) return;
+
+  const reason = window.prompt("異常ロックを解除する理由を入力してください（必須）。", "");
+  if (reason === null) return;
+  if (!reason.trim()) {
+    window.alert("解除理由を入力してください。");
+    return;
+  }
+
+  button.disabled = true;
+  const { data: latestLock, error: latestError } = await adminSupabase.rpc(
+    "get_spot_import_anomaly_lock"
+  );
+  if (latestError) {
+    button.disabled = false;
+    jobMessage.textContent = explainJobError(latestError);
+    console.error("get_spot_import_anomaly_lock before release:", latestError);
+    return;
+  }
+
+  if (
+    latestLock?.lock_status !== "anomaly" ||
+    latestLock?.locked_job_id !== lock.locked_job_id
+  ) {
+    jobMessage.textContent = "異常ロックの状態が変わっています。一覧を更新しました。";
+    await loadJobs();
+    return;
+  }
+
+  const { data: result, error } = await adminSupabase.rpc(
+    "release_spot_import_anomaly_lock",
+    {
+      p_confirm_old_worker_stopped: true,
+      p_reason: reason.trim()
+    }
+  );
+
+  if (error) {
+    button.disabled = false;
+    jobMessage.textContent = explainJobError(error);
+    console.error("release_spot_import_anomaly_lock:", error);
+    return;
+  }
+
+  if (
+    result?.released !== true ||
+    result?.job_id !== lock.locked_job_id ||
+    result?.processing_data_reset !== false
+  ) {
+    button.disabled = false;
+    jobMessage.textContent = "解除結果を想定どおり確認できませんでした。状態を再確認してください。";
+    console.error("Unexpected anomaly lock release result:", result);
+    await loadJobs();
+    return;
+  }
+
+  await loadJobs();
+  jobMessage.textContent =
+    "異常ロックを解除しました。対象ジョブは一時停止状態です。データはリセットしていません。ジョブの再開はまだ行っていません。";
 }
 
 async function createJob(event) {
