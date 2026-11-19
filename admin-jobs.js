@@ -128,7 +128,6 @@ function renderJob(job) {
   details.className = "job-meta";
   details.append(
     makeText("span", "工程：" + stageLabel(job.current_stage)),
-    makeText("span", "施設上限：" + job.max_facilities),
     makeText("span", "バッチ：" + job.batch_size),
     makeText("span", "登録：" + formatDate(job.created_at)),
     makeText("span", "更新：" + formatDate(job.updated_at))
@@ -274,7 +273,6 @@ async function createJob(event) {
   errorBox.textContent = "";
 
   const sourceUrl = document.getElementById("sourceUrl").value.trim();
-  const maxFacilities = Number(document.getElementById("maxFacilities").value);
   const batchSize = Number(document.getElementById("batchSize").value);
 
   let parsedUrl;
@@ -286,10 +284,6 @@ async function createJob(event) {
     errorBox.textContent = "収集元URLにはHTTPSを指定してください。";
     return;
   }
-  if (!Number.isInteger(maxFacilities) || maxFacilities < 1 || maxFacilities > 10000) {
-    errorBox.textContent = "最大施設数は1〜10000の整数で入力してください。";
-    return;
-  }
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1000) {
     errorBox.textContent = "バッチサイズは1〜1000の整数で入力してください。";
     return;
@@ -299,7 +293,6 @@ async function createJob(event) {
     "次の内容で収集ジョブを登録します。\n\n" +
     "地域：" + jobRegionName + "\n" +
     "開始URL：" + sourceUrl + "\n" +
-    "最大施設数：" + maxFacilities + "\n" +
     "バッチサイズ：" + batchSize + "\n\n" +
     "登録すると開始指示付きで待機列に入り、自動処理が始まります。よろしいですか？"
   );
@@ -310,7 +303,7 @@ async function createJob(event) {
   const { data, error } = await adminSupabase.rpc("create_spot_import_job", {
     p_region_id: jobRegionId,
     p_source_url: sourceUrl,
-    p_max_facilities: maxFacilities,
+    p_max_facilities: 10000,
     p_batch_size: batchSize
   });
   button.disabled = false;
@@ -323,7 +316,6 @@ async function createJob(event) {
   }
 
   createForm.reset();
-  document.getElementById("maxFacilities").value = "1";
   document.getElementById("batchSize").value = "10";
   jobMessage.textContent = "ジョブを登録しました。処理待ち列に入りました。";
   await loadJobs();
