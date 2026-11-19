@@ -370,8 +370,14 @@ function statusLabel(status) {
 
 function stageLabel(stage) {
   const labels = {
-    url_collection: "URL収集", extraction: "情報抽出",
-    analysis: "分析", ai_merge: "AI統合", human_review: "人による審査"
+    url_collection: "URL収集",
+    page_extraction: "ページ抽出",
+    candidate_analysis: "候補分析",
+    information_merge: "情報統合",
+    human_review: "人による審査",
+    extraction: "情報抽出",
+    analysis: "分析",
+    ai_merge: "AI統合"
   };
   return labels[stage] || stage || "未設定";
 }
