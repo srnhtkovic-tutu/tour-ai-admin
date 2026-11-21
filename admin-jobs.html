@@ -31,17 +31,10 @@
         <label for="sourceUrl">収集元URL（HTTPS・必須）</label>
         <input id="sourceUrl" type="url" inputmode="url" maxlength="2000" placeholder="https://example.jp/" required>
       </div>
-      <div class="job-form-grid">
-        <div class="field">
-          <label for="maxFacilities">最大施設数</label>
-          <input id="maxFacilities" type="number" min="1" max="10000" value="1" required>
-          <small class="help-text">AI統合候補の上限です。サイトマップのURL収集件数の上限ではありません。</small>
-        </div>
-        <div class="field">
-          <label for="batchSize">バッチサイズ</label>
-          <input id="batchSize" type="number" min="1" max="1000" value="10" required>
-          <small class="help-text">1回の処理単位で扱う件数です。</small>
-        </div>
+      <div class="field">
+        <label for="batchSize">バッチサイズ</label>
+        <input id="batchSize" type="number" min="1" max="1000" value="10" required>
+        <small class="help-text">1回の処理単位で扱う件数です。</small>
       </div>
       <p id="createJobError" class="form-error" role="alert"></p>
       <div class="form-actions">

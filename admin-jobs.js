@@ -128,7 +128,6 @@ function renderJob(job) {
   details.className = "job-meta";
   details.append(
     makeText("span", "工程：" + stageLabel(job.current_stage)),
-    makeText("span", "施設上限：" + job.max_facilities),
     makeText("span", "バッチ：" + job.batch_size),
     makeText("span", "登録：" + formatDate(job.created_at)),
     makeText("span", "更新：" + formatDate(job.updated_at))
@@ -188,7 +187,7 @@ function renderAnomalyLock(lock) {
 
   let releaseButton;
   releaseButton = makeActionButton(
-    "異常ロックを解除",
+    "異常ジョブの復旧準備",
     () => releaseAnomalyLock(lock, releaseButton),
     "secondary-button"
   );
@@ -200,18 +199,20 @@ async function releaseAnomalyLock(lock, button) {
   if (!jobIsSystemAdmin || !lock?.locked_job_id) return;
 
   const confirmed = window.confirm(
-    "異常ロックを解除します。\n\n" +
-    "実行前に、古いWorkerが停止していることをログ等で確認してください。\n" +
-    "解除後、対象ジョブは一時停止状態になります。\n" +
-    "ジョブの再開は別操作です。取得済みデータはリセットされません。\n\n" +
+    "異常ジョブの復旧準備を実行します。\n\n" +
+    "対象ジョブを情報統合工程からページ抽出工程へ戻し、一時停止状態にします。\n" +
+    "タイムアウト・一時的なGeminiエラーの抽出失敗だけを再試行対象に戻します。\n" +
+    "課金不足による失敗はそのまま残します。\n" +
+    "既存の候補・統合データ・途中経過は削除しません。\n" +
+    "復旧後にジョブが自動再開することはありません。\n\n" +
     "古いWorkerが停止していることを確認しましたか？"
   );
   if (!confirmed) return;
 
-  const reason = window.prompt("異常ロックを解除する理由を入力してください（必須）。", "");
+  const reason = window.prompt("復旧を実行する理由を入力してください（必須）。", "旧Workerのpage_id異常に伴う再処理準備");
   if (reason === null) return;
   if (!reason.trim()) {
-    window.alert("解除理由を入力してください。");
+    window.alert("理由を入力してください。");
     return;
   }
 
@@ -222,7 +223,7 @@ async function releaseAnomalyLock(lock, button) {
   if (latestError) {
     button.disabled = false;
     jobMessage.textContent = explainJobError(latestError);
-    console.error("get_spot_import_anomaly_lock before release:", latestError);
+    console.error("get_spot_import_anomaly_lock before recovery:", latestError);
     return;
   }
 
@@ -230,14 +231,16 @@ async function releaseAnomalyLock(lock, button) {
     latestLock?.lock_status !== "anomaly" ||
     latestLock?.locked_job_id !== lock.locked_job_id
   ) {
+    button.disabled = false;
     jobMessage.textContent = "異常ロックの状態が変わっています。一覧を更新しました。";
     await loadJobs();
     return;
   }
 
   const { data: result, error } = await adminSupabase.rpc(
-    "release_spot_import_anomaly_lock",
+    "prepare_spot_import_job_recovery",
     {
+      p_job_id: lock.locked_job_id,
       p_confirm_old_worker_stopped: true,
       p_reason: reason.trim()
     }
@@ -246,27 +249,24 @@ async function releaseAnomalyLock(lock, button) {
   if (error) {
     button.disabled = false;
     jobMessage.textContent = explainJobError(error);
-    console.error("release_spot_import_anomaly_lock:", error);
+    console.error("prepare_spot_import_job_recovery:", error);
     return;
   }
 
-  if (
-    result?.released !== true ||
-    result?.job_id !== lock.locked_job_id ||
-    result?.processing_data_reset !== false
-  ) {
+  if (!result || typeof result !== "object") {
     button.disabled = false;
-    jobMessage.textContent = "解除結果を想定どおり確認できませんでした。状態を再確認してください。";
-    console.error("Unexpected anomaly lock release result:", result);
+    jobMessage.textContent = "復旧関数の戻り値を確認できませんでした。状態を再確認してください。";
+    console.error("Unexpected recovery result:", result);
     await loadJobs();
     return;
   }
 
   await loadJobs();
   jobMessage.textContent =
-    "異常ロックを解除しました。対象ジョブは一時停止状態です。データはリセットしていません。ジョブの再開はまだ行っていません。";
+    "復旧準備が完了しました。対象ジョブはページ抽出工程の一時停止状態です。 " +
+    "自動再開はしていません。結果の詳細はブラウザーの開発者コンソールで確認できます。";
+  console.info("Spot import recovery result:", result);
 }
-
 async function createJob(event) {
   event.preventDefault();
   const errorBox = document.getElementById("createJobError");
@@ -274,7 +274,6 @@ async function createJob(event) {
   errorBox.textContent = "";
 
   const sourceUrl = document.getElementById("sourceUrl").value.trim();
-  const maxFacilities = Number(document.getElementById("maxFacilities").value);
   const batchSize = Number(document.getElementById("batchSize").value);
 
   let parsedUrl;
@@ -286,10 +285,6 @@ async function createJob(event) {
     errorBox.textContent = "収集元URLにはHTTPSを指定してください。";
     return;
   }
-  if (!Number.isInteger(maxFacilities) || maxFacilities < 1 || maxFacilities > 10000) {
-    errorBox.textContent = "最大施設数は1〜10000の整数で入力してください。";
-    return;
-  }
   if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 1000) {
     errorBox.textContent = "バッチサイズは1〜1000の整数で入力してください。";
     return;
@@ -299,7 +294,6 @@ async function createJob(event) {
     "次の内容で収集ジョブを登録します。\n\n" +
     "地域：" + jobRegionName + "\n" +
     "開始URL：" + sourceUrl + "\n" +
-    "最大施設数：" + maxFacilities + "\n" +
     "バッチサイズ：" + batchSize + "\n\n" +
     "登録すると開始指示付きで待機列に入り、自動処理が始まります。よろしいですか？"
   );
@@ -310,7 +304,7 @@ async function createJob(event) {
   const { data, error } = await adminSupabase.rpc("create_spot_import_job", {
     p_region_id: jobRegionId,
     p_source_url: sourceUrl,
-    p_max_facilities: maxFacilities,
+    p_max_facilities: 10000,
     p_batch_size: batchSize
   });
   button.disabled = false;
@@ -323,7 +317,6 @@ async function createJob(event) {
   }
 
   createForm.reset();
-  document.getElementById("maxFacilities").value = "1";
   document.getElementById("batchSize").value = "10";
   jobMessage.textContent = "ジョブを登録しました。処理待ち列に入りました。";
   await loadJobs();
@@ -377,8 +370,14 @@ function statusLabel(status) {
 
 function stageLabel(stage) {
   const labels = {
-    url_collection: "URL収集", extraction: "情報抽出",
-    analysis: "分析", ai_merge: "AI統合", human_review: "人による審査"
+    url_collection: "URL収集",
+    page_extraction: "ページ抽出",
+    candidate_analysis: "候補分析",
+    information_merge: "情報統合",
+    human_review: "人による審査",
+    extraction: "情報抽出",
+    analysis: "分析",
+    ai_merge: "AI統合"
   };
   return labels[stage] || stage || "未設定";
 }
