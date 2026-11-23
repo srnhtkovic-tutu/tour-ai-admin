@@ -55,7 +55,7 @@ function safeErrorFields(error: unknown) {
   };
 }
 
-type MergeTask = { spot_name: string; mode: "start" | "continue" | "merge" } | null;
+type MergeTask = { spot_name: string; mode: "start" | "continue" | "merge"; evaluation_target?: "normal" | "reevaluation" } | null;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -100,7 +100,7 @@ async function getNextMergeTask(jobId: string): Promise<MergeTask> {
   for (let offset = 0; ; offset += mergedPageSize) {
     const { data, error } = await supabase
       .from("spot_import_merged_v2")
-      .select("spot_name,status,merged_data,relevance_status,relevance_results,relevance_progress")
+      .select("spot_name,status,merged_data,relevance_status,relevance_results,relevance_progress,reevaluation_status,reevaluation_progress")
       .eq("job_id", jobId)
       .order("created_at", { ascending: true })
       .range(offset, offset + mergedPageSize - 1);
@@ -119,6 +119,25 @@ async function getNextMergeTask(jobId: string): Promise<MergeTask> {
     if (row?.status === "skipped" || row?.relevance_status === "skipped") continue;
 
     if (!row) return { spot_name: spotName, mode: "start" };
+
+    // 管理者が要求した再評価を通常処理より優先する。
+    // 再評価の進捗・結果は専用列に保存し、通常の評価列には触れない。
+    if (row.reevaluation_status === "pending") {
+      return { spot_name: spotName, mode: "start", evaluation_target: "reevaluation" };
+    }
+    if (row.reevaluation_status === "running") {
+      const reevaluationProgress = row.reevaluation_progress;
+      if (reevaluationProgress?.sources && Array.isArray(reevaluationProgress.sources)) {
+        return {
+          spot_name: spotName,
+          mode: reevaluationProgress.status === "completed" ? "merge" : "continue",
+          evaluation_target: "reevaluation",
+        };
+      }
+      return { spot_name: spotName, mode: "start", evaluation_target: "reevaluation" };
+    }
+    // エラー・完了した再評価は管理者の明示操作があるまで通常処理へ戻さない。
+    if (row.reevaluation_status === "error" || row.reevaluation_status === "completed") continue;
 
     // 施設単位のエラーはこのジョブ全体を止めず、後続施設へ進む。
     // 管理者が再開を指示した場合はstatus/relevance_statusを戻して再びキューに載せる。
@@ -430,6 +449,7 @@ Deno.serve(async (req: Request) => {
             body: JSON.stringify({
               job_id: jobId, execution_id: executionId, lock_token: lockToken,
               mode: task.mode, spot_name: task.spot_name,
+              evaluation_target: task.evaluation_target ?? "normal",
             }),
           });
         } catch (error) {
