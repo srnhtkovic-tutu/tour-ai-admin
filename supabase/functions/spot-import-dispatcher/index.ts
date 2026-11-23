@@ -144,6 +144,132 @@ async function getNextMergeTask(jobId: string): Promise<MergeTask> {
   return null;
 }
 
+function normalizeNameLegacy(value: string): string {
+  return value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
+}
+
+async function getNextMergeTaskLegacy(jobId: string): Promise<MergeTask> {
+  const candidateRows: any[] = [];
+  const candidatePageSize = 1000;
+  for (let offset = 0; ; offset += candidatePageSize) {
+    const { data, error } = await supabase
+      .from("spot_import_candidates")
+      .select("name")
+      .eq("job_id", jobId)
+      .order("name", { ascending: true })
+      .order("id", { ascending: true })
+      .range(offset, offset + candidatePageSize - 1);
+    if (error) throw error;
+    candidateRows.push(...(data ?? []));
+    if (!data || data.length < candidatePageSize) break;
+  }
+
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const row of candidateRows) {
+    const name = String(row.name ?? "").trim();
+    const key = normalizeNameLegacy(name);
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+
+  // job_idでページ候補を一括ページングし、施設名との照合はメモリ上で行う。
+  // 施設名100件ずつの.in()検索を繰り返す方式を避け、DBアクセス回数を抑える。
+  const pageCandidateNames = new Set<string>();
+  const pageCandidatePageSize = 1000;
+  for (let offset = 0; ; offset += pageCandidatePageSize) {
+    const { data, error } = await supabase
+      .from("spot_import_page_candidates")
+      .select("name")
+      .eq("job_id", jobId)
+      .order("id", { ascending: true })
+      .range(offset, offset + pageCandidatePageSize - 1);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const name = String(row.name ?? "");
+      if (name) pageCandidateNames.add(name);
+    }
+    if (!data || data.length < pageCandidatePageSize) break;
+  }
+
+  const mergedRows: any[] = [];
+  const mergedPageSize = 1000;
+  for (let offset = 0; ; offset += mergedPageSize) {
+    const { data, error } = await supabase
+      .from("spot_import_merged_v2")
+      .select("spot_name,status,merged_data,relevance_status,relevance_progress")
+      .eq("job_id", jobId)
+      .order("spot_name", { ascending: true })
+      .range(offset, offset + mergedPageSize - 1);
+    if (error) throw error;
+    mergedRows.push(...(data ?? []));
+    if (!data || data.length < mergedPageSize) break;
+  }
+
+  const mergedByName = new Map<string, any>();
+  for (const row of mergedRows) mergedByName.set(normalizeNameLegacy(row.spot_name), row);
+
+  for (const spotName of names) {
+    const row = mergedByName.get(normalizeNameLegacy(spotName));
+    if (row?.status === "skipped" || row?.relevance_status === "skipped") continue;
+
+    if (!pageCandidateNames.has(spotName) && !row) {
+      const skippedAt = new Date().toISOString();
+      const skipReason = "ページ候補テーブルに完全一致する候補名がないため、今回の統合対象からスキップしました。";
+      const { error: skipError } = await supabase
+        .from("spot_import_merged_v2")
+        .insert({
+          job_id: jobId,
+          spot_name: spotName,
+          status: "skipped",
+          error_message: skipReason,
+          relevance_status: "skipped",
+          relevance_progress: {
+            job_id: jobId,
+            spot_name: spotName,
+            status: "skipped",
+            skip_reason: "no_exact_page_candidate",
+            reason: skipReason,
+            skipped_at: skippedAt,
+          },
+        });
+      if (skipError) throw skipError;
+      logEvent("dispatcher.merge_candidate_skipped", {
+        job_id: jobId,
+        spot_name: spotName,
+        reason: "no_exact_page_candidate",
+        skipped_at: skippedAt,
+      });
+      continue;
+    }
+
+    if (!row) return { spot_name: spotName, mode: "start" };
+
+    if (row.status === "failed" || row.relevance_status === "failed") {
+      throw new Error(`スポット「${spotName}」の統合処理が失敗状態です。管理者による確認が必要です。`);
+    }
+
+    if (row.merged_data && row.relevance_progress?.merged_at) continue;
+
+    if (row.relevance_status === "completed") {
+      return { spot_name: spotName, mode: "merge" };
+    }
+
+    if (row.relevance_progress?.sources && Array.isArray(row.relevance_progress.sources)) {
+      return { spot_name: spotName, mode: "continue" };
+    }
+
+    if (!row.relevance_progress && (!row.relevance_results || row.relevance_results.length === 0)) {
+      return { spot_name: spotName, mode: "start" };
+    }
+
+    throw new Error(`スポット「${spotName}」の統合進捗データを確認できません。管理者による確認が必要です。`);
+  }
+
+  return null;
+}
+
 async function markAnomaly(claim: any, reason: string) {
   if (!claim?.job_id || !claim?.execution_id || !claim?.lock_token) return;
   try {
@@ -212,6 +338,8 @@ Deno.serve(async (req: Request) => {
     const jobId = String(claim.job_id ?? "");
     const executionId = String(claim.execution_id ?? "");
     const lockToken = String(claim.lock_token ?? "");
+    // 既存ジョブはlegacy_v1、新規ジョブはredesign_v1として別経路で処理する。
+    const pipelineVersion = String(claim.pipeline_version ?? "legacy_v1");
     logJobId = jobId;
     logExecutionId = executionId;
     logStage = stage;
@@ -221,7 +349,9 @@ Deno.serve(async (req: Request) => {
       url_collection: "collect-spot-import-urls-worker-v2",
       page_extraction: "extract-spot-page-candidates-worker-v2",
       candidate_analysis: "analyze-spot-import-batch-worker-v2",
-      information_merge: "merge-spot-information-v2-worker",
+      information_merge: pipelineVersion === "redesign_v1"
+        ? "merge-spot-information-v3-worker"
+        : "merge-spot-information-v2-worker",
     };
     const workerSlug = workerByStage[stage];
     if (!workerSlug) throw new Error(`未対応の処理工程です: ${stage}`);
@@ -267,7 +397,9 @@ Deno.serve(async (req: Request) => {
     if (stage === "information_merge") {
       let task: MergeTask;
       try {
-        task = await getNextMergeTask(jobId);
+        task = pipelineVersion === "redesign_v1"
+          ? await getNextMergeTask(jobId)
+          : await getNextMergeTaskLegacy(jobId);
       } catch (error) {
         const wrapped = new Error(`情報統合タスク選択中に失敗: ${safeLogText(error)}`);
         (wrapped as Error & { cause?: unknown; context?: string }).cause = error;
@@ -327,7 +459,9 @@ Deno.serve(async (req: Request) => {
         if (task.mode === "merge") {
           let nextTask: MergeTask;
           try {
-            nextTask = await getNextMergeTask(jobId);
+            nextTask = pipelineVersion === "redesign_v1"
+              ? await getNextMergeTask(jobId)
+              : await getNextMergeTaskLegacy(jobId);
           } catch (error) {
             const wrapped = new Error(`統合Worker完了後の次タスク確認中に失敗: ${safeLogText(error)}`);
             (wrapped as Error & { cause?: unknown; context?: string }).cause = error;
@@ -389,14 +523,20 @@ Deno.serve(async (req: Request) => {
     }
     if (heartbeatError) throw new Error(`実行リースの延長に失敗しました: ${heartbeatError}`);
 
-    const nextStage = hasMoreWork
-      ? stage
-      : ({
+    const transitions: Record<string, string | null> = pipelineVersion === "redesign_v1"
+      ? {
           url_collection: "page_extraction",
           page_extraction: "information_merge",
           candidate_analysis: "information_merge",
           information_merge: null,
-        } as Record<string, string | null>)[stage];
+        }
+      : {
+          url_collection: "page_extraction",
+          page_extraction: "candidate_analysis",
+          candidate_analysis: "information_merge",
+          information_merge: null,
+        };
+    const nextStage = hasMoreWork ? stage : transitions[stage];
 
     const finishStarted = performance.now();
     logEvent("dispatcher.finish_started", {
