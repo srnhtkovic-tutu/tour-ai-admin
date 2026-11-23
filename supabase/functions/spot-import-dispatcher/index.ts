@@ -121,10 +121,11 @@ async function getNextMergeTask(jobId: string): Promise<MergeTask> {
   const candidatePageSize = 1000;
   for (let offset = 0; ; offset += candidatePageSize) {
     const { data, error } = await supabase
-      .from("spot_import_page_candidates")
-      .select("name,extraction_order")
+      .from("spot_import_candidates")
+      .select("name")
       .eq("job_id", jobId)
-      .order("extraction_order", { ascending: true })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .range(offset, offset + candidatePageSize - 1);
     if (error) throw error;
     candidateRows.push(...(data ?? []));
