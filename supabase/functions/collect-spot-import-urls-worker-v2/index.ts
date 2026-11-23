@@ -363,23 +363,20 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const [pendingResult, retryResult, processingResult, pendingSitemapResult, retrySitemapResult] = await Promise.all([
+    const [pendingResult, retryResult, processingResult, sitemapCountsResult] = await Promise.all([
       supabase.from("spot_import_urls").select("id", { count: "exact", head: true })
         .eq("job_id", jobId).eq("crawl_status", "pending"),
       supabase.from("spot_import_urls").select("id", { count: "exact", head: true })
         .eq("job_id", jobId).eq("crawl_status", "failed").lt("retry_count", 2),
       supabase.from("spot_import_urls").select("id", { count: "exact", head: true })
         .eq("job_id", jobId).eq("crawl_status", "processing"),
-      supabase.schema("private").from("spot_import_sitemaps").select("id", { count: "exact", head: true })
-        .eq("job_id", jobId).eq("status", "pending"),
-      supabase.schema("private").from("spot_import_sitemaps").select("id", { count: "exact", head: true })
-        .eq("job_id", jobId).eq("status", "failed").lt("retry_count", 2),
+      supabase.rpc("worker_get_sitemap_queue_counts", { p_job_id: jobId }),
     ]);
     if (pendingResult.error) throw pendingResult.error;
     if (retryResult.error) throw retryResult.error;
     if (processingResult.error) throw processingResult.error;
-    if (pendingSitemapResult.error) throw pendingSitemapResult.error;
-    if (retrySitemapResult.error) throw retrySitemapResult.error;
+    if (sitemapCountsResult.error) throw sitemapCountsResult.error;
+    const sitemapCounts = sitemapCountsResult.data?.[0] ?? { pending_count: 0, retryable_failed_count: 0 };
 
     return jsonResponse({
       job_id: jobId,
@@ -395,13 +392,13 @@ Deno.serve(async (req: Request) => {
       sitemaps_failed: sitemapsFailed,
       sitemap_pages_added: sitemapPagesAdded,
       child_sitemaps_added: childSitemapsAdded,
-      pending_sitemaps: pendingSitemapResult.count ?? 0,
-      retryable_failed_sitemaps: retrySitemapResult.count ?? 0,
+      pending_sitemaps: sitemapCounts.pending_count ?? 0,
+      retryable_failed_sitemaps: sitemapCounts.retryable_failed_count ?? 0,
       pending_urls: pendingResult.count ?? 0,
       retryable_failed_urls: retryResult.count ?? 0,
       processing_urls: processingResult.count ?? 0,
       has_more_work: (pendingResult.count ?? 0) > 0 || (retryResult.count ?? 0) > 0
-        || (pendingSitemapResult.count ?? 0) > 0 || (retrySitemapResult.count ?? 0) > 0,
+        || (sitemapCounts.pending_count ?? 0) > 0 || (sitemapCounts.retryable_failed_count ?? 0) > 0,
     });
   } catch (error) {
     console.error("URL収集Workerエラー:", error);
