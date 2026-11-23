@@ -284,24 +284,44 @@ async function saveProgress(
     (progress.sources ?? []).flatMap((source: any) => source.page_ids ?? [])
   )];
 
-  const { data, error } = await supabase.rpc("worker_save_merge_progress", {
-    p_job_id: jobId,
-    p_execution_id: executionId,
-    p_lock_token: lockToken,
-    p_spot_name: spotName,
-    p_status: options.status ?? "pending",
-    p_source_count: options.sourceCount ?? 0,
-    p_input_char_count: options.inputCharCount ?? 0,
-    p_source_candidate_ids: sourceCandidateIds,
-    p_source_url_ids: sourceUrlIds,
-    p_sources: options.sources ?? progress.sources ?? [],
-    p_merged_data: options.mergedData ?? null,
-    p_model: options.model ?? null,
-    p_relevance_status: relevanceStatus,
-    p_relevance_results: results,
-    p_relevance_model: RELEVANCE_MODEL,
-    p_relevance_progress: progress,
-  });
+  const isReevaluation = options.evaluationTarget === "reevaluation";
+  const { data, error } = isReevaluation
+    ? await supabase.rpc("worker_save_spot_import_reevaluation_progress", {
+        p_job_id: jobId,
+        p_execution_id: executionId,
+        p_lock_token: lockToken,
+        p_spot_name: spotName,
+        p_reevaluation_status:
+          progress.status === "failed" || progress.merge_status === "failed"
+            ? "error"
+            : options.mergedData || progress.merge_status === "completed" || progress.status === "skipped"
+              ? "completed"
+              : "running",
+        p_reevaluation_progress: progress,
+        p_reevaluation_results: results,
+        p_reevaluation_relevance_model: RELEVANCE_MODEL,
+        p_reevaluation_merged_data: options.mergedData ?? null,
+        p_reevaluation_model: options.model ?? null,
+        p_reevaluation_error_message: progress.last_error || progress.merge_error || null,
+      })
+    : await supabase.rpc("worker_save_merge_progress", {
+        p_job_id: jobId,
+        p_execution_id: executionId,
+        p_lock_token: lockToken,
+        p_spot_name: spotName,
+        p_status: options.status ?? "pending",
+        p_source_count: options.sourceCount ?? 0,
+        p_input_char_count: options.inputCharCount ?? 0,
+        p_source_candidate_ids: sourceCandidateIds,
+        p_source_url_ids: sourceUrlIds,
+        p_sources: options.sources ?? progress.sources ?? [],
+        p_merged_data: options.mergedData ?? null,
+        p_model: options.model ?? null,
+        p_relevance_status: relevanceStatus,
+        p_relevance_results: results,
+        p_relevance_model: RELEVANCE_MODEL,
+        p_relevance_progress: progress,
+      });
   if (error) throw error;
   return data;
 }
@@ -621,15 +641,20 @@ function normalizeGuideData(value: any): GuideData {
   };
 }
 
-async function handleStart(jobId: string, spotName: string, restart: boolean, executionId: string, lockToken: string) {
+async function handleStart(jobId: string, spotName: string, restart: boolean, executionId: string, lockToken: string, evaluationTarget = "normal") {
   const existing = await getMergedRow(jobId, spotName);
-  const oldProgress = existing?.relevance_progress;
-  const hasPriorState = !!(existing?.relevance_results?.length || oldProgress);
+  const isReevaluation = evaluationTarget === "reevaluation";
+  const oldProgress = isReevaluation ? existing?.reevaluation_progress : existing?.relevance_progress;
+  const oldResults = isReevaluation ? existing?.reevaluation_results : existing?.relevance_results;
+  if (isReevaluation && !["pending", "running", "error"].includes(String(existing?.reevaluation_status || ""))) {
+    return jsonResponse({ success: false, error: "再評価が開始要求されていないか、現在の状態では開始できません。" }, 409);
+  }
+  const hasPriorState = !!(oldResults?.length || oldProgress);
   if (hasPriorState && !restart) {
     return jsonResponse({
       success: false,
       error: "このジョブ・スポットには過去の評価結果または進捗が残っています。続きはcontinue、最初からやり直す場合はmode=restartを指定してください。",
-      relevance_status: existing.relevance_status,
+      relevance_status: isReevaluation ? existing.reevaluation_status : existing.relevance_status,
       progress: oldProgress,
     }, 409);
   }
@@ -657,6 +682,7 @@ async function handleStart(jobId: string, spotName: string, restart: boolean, ex
       inputCharCount: 0,
       sourceCandidateIds: candidateIds,
       sourceUrlIds,
+      evaluationTarget,
     });
     return jsonResponse({ success: true, mode: "skipped", job_id: jobId, spot_name: spotName, reason: "no_related_pages" });
   }
@@ -678,7 +704,7 @@ async function handleStart(jobId: string, spotName: string, restart: boolean, ex
     started_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  await saveProgress(jobId, spotName, "in_progress", [], progress, executionId, lockToken);
+  await saveProgress(jobId, spotName, "in_progress", [], progress, executionId, lockToken, { evaluationTarget });
   return jsonResponse({
     success: true,
     mode: restart ? "restart" : "start",
@@ -691,9 +717,11 @@ async function handleStart(jobId: string, spotName: string, restart: boolean, ex
   });
 }
 
-async function handleContinue(jobId: string, spotName: string, executionId: string, lockToken: string) {
+async function handleContinue(jobId: string, spotName: string, executionId: string, lockToken: string, evaluationTarget = "normal") {
   const row = await getMergedRow(jobId, spotName);
-  const progress = row?.relevance_progress;
+  const isReevaluation = evaluationTarget === "reevaluation";
+  const progress = isReevaluation ? row?.reevaluation_progress : row?.relevance_progress;
+  const savedResults = isReevaluation ? row?.reevaluation_results : row?.relevance_results;
   if (!progress?.sources || !Array.isArray(progress.sources)) {
     return jsonResponse({ success: false, error: "このジョブ・スポットの進捗がありません。先にmode=startを実行してください。" }, 409);
   }
@@ -744,11 +772,11 @@ async function handleContinue(jobId: string, spotName: string, executionId: stri
       jobId,
       spotName,
       terminal ? "failed" : "in_progress",
-      row.relevance_results || [],
+      savedResults || [],
       failedProgress,
       executionId,
       lockToken,
-      { status: terminal ? "failed" : "pending" },
+      { status: terminal ? "failed" : "pending", evaluationTarget },
     );
     return jsonResponse({
       success: true,
@@ -771,7 +799,7 @@ async function handleContinue(jobId: string, spotName: string, executionId: stri
       relevant_information: String(item.relevant_information || ""),
     };
   });
-  const allResults: RelevanceResult[] = [...(row.relevance_results || []), ...normalized];
+  const allResults: RelevanceResult[] = [...(savedResults || []), ...normalized];
   const completedIds = new Set<string>(progress.completed_page_ids || []);
   for (const result of normalized) completedIds.add(result.page_id);
   const done = allResults.length === sources.length && completedIds.size === sources.length;
@@ -790,7 +818,7 @@ async function handleContinue(jobId: string, spotName: string, executionId: stri
       completed_at: new Date().toISOString(),
     },
   };
-  await saveProgress(jobId, spotName, done ? "completed" : "in_progress", allResults, updatedProgress, executionId, lockToken);
+  await saveProgress(jobId, spotName, done ? "completed" : "in_progress", allResults, updatedProgress, executionId, lockToken, { evaluationTarget });
   return jsonResponse({
     success: true,
     mode: "continue",
@@ -807,10 +835,11 @@ async function handleContinue(jobId: string, spotName: string, executionId: stri
   });
 }
 
-async function handleMerge(jobId: string, spotName: string, executionId: string, lockToken: string) {
+async function handleMerge(jobId: string, spotName: string, executionId: string, lockToken: string, evaluationTarget = "normal") {
   const row = await getMergedRow(jobId, spotName);
-  const progress = row?.relevance_progress;
-  const results: RelevanceResult[] = row?.relevance_results || [];
+  const isReevaluation = evaluationTarget === "reevaluation";
+  const progress = isReevaluation ? row?.reevaluation_progress : row?.relevance_progress;
+  const results: RelevanceResult[] = isReevaluation ? row?.reevaluation_results || [] : row?.relevance_results || [];
   if (!progress || progress.status !== "completed" || results.length !== progress.total_pages) {
     return jsonResponse({
       success: false,
@@ -878,6 +907,7 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
       sourceCandidateIds: candidateIds,
       sourceUrlIds: urlIds,
       sources: serializedSources(),
+      evaluationTarget,
     });
     return jsonResponse({
       success: true,
@@ -935,7 +965,7 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
       retryProgress,
       executionId,
       lockToken,
-      { status: terminal ? "failed" : "pending" },
+      { status: terminal ? "failed" : "pending", evaluationTarget },
     );
     return jsonResponse({
       success: true,
@@ -990,6 +1020,7 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
       sources: serializedSources(),
       mergedData,
       model: MODEL,
+      evaluationTarget,
     },
   );
 
@@ -1036,6 +1067,10 @@ Deno.serve(async (req: Request) => {
     const mode = String(body.mode || "").trim().toLowerCase();
     const executionId = String(body.execution_id || "").trim();
     const lockToken = String(body.lock_token || "").trim();
+    const evaluationTarget = String(body.evaluation_target || "normal").trim().toLowerCase();
+    if (!["normal", "reevaluation"].includes(evaluationTarget)) {
+      return jsonResponse({ error: "evaluation_targetが不正です。" }, 400);
+    }
 
     if (!jobId || !isUuid(jobId)) return jsonResponse({ error: "job_idは正しいUUID形式で指定してください。" }, 400);
     if (!spotName) return jsonResponse({ error: "spot_nameを指定してください。" }, 400);
@@ -1043,9 +1078,9 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "有効なexecution_idとlock_tokenが必要です。" }, 400);
     }
 
-    if (mode === "start") return await handleStart(jobId, spotName, false, executionId, lockToken);
-    if (mode === "continue") return await handleContinue(jobId, spotName, executionId, lockToken);
-    if (mode === "merge") return await handleMerge(jobId, spotName, executionId, lockToken);
+    if (mode === "start") return await handleStart(jobId, spotName, false, executionId, lockToken, evaluationTarget);
+    if (mode === "continue") return await handleContinue(jobId, spotName, executionId, lockToken, evaluationTarget);
+    if (mode === "merge") return await handleMerge(jobId, spotName, executionId, lockToken, evaluationTarget);
     return jsonResponse({ error: "modeはstart / continue / mergeのいずれかを指定してください。" }, 400);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
