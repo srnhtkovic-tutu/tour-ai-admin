@@ -723,43 +723,8 @@ async function handleContinue(jobId: string, spotName: string, executionId: stri
     extracted_text: source.extracted_text,
   }));
 
-  let batchResults: any[];
-  try {
-    const data = await callGemini(RELEVANCE_MODEL, makeRelevancePrompt(spotName, items), 90000);
-    batchResults = validateBatch(items, data?.evaluations, batchIndex + 1);
-  } catch (error) {
-    // Geminiの再試行はCron実行をまたいで管理し、1回の実行時間を長くしすぎない。
-    const attempts = Number(progress.batch_attempts || 0) + 1;
-    const terminal = attempts >= 3;
-    const message = error instanceof Error ? error.message : String(error);
-    const failedProgress = {
-      ...progress,
-      status: terminal ? "failed" : "in_progress",
-      batch_attempts: attempts,
-      last_error: message.slice(0, 1800),
-      last_error_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    await saveProgress(
-      jobId,
-      spotName,
-      terminal ? "failed" : "in_progress",
-      row.relevance_results || [],
-      failedProgress,
-      executionId,
-      lockToken,
-      { status: terminal ? "failed" : "pending" },
-    );
-    return jsonResponse({
-      success: true,
-      mode: "continue",
-      facility_status: terminal ? "failed" : "retry_pending",
-      batch_number: batchIndex + 1,
-      attempt: attempts,
-      max_attempts: 3,
-      error: message.slice(0, 500),
-    });
-  }
+  const data = await callGemini(RELEVANCE_MODEL, makeRelevancePrompt(spotName, items), 90000);
+  const batchResults = validateBatch(items, data?.evaluations, batchIndex + 1);
 
   const normalized: RelevanceResult[] = batchResults.map((item: any) => {
     const source = sources.find((s) => s.page_ids[0] === String(item.page_id))!;
@@ -910,42 +875,7 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
 
   console.log("詳細統合 Gemini送信ページ数", included, "本文文字数", bodyCharacterCount);
 
-  let aiResult: any;
-  try {
-    aiResult = await callGemini(MODEL, makeMergePrompt(spotName, inputText), 90000);
-  } catch (error) {
-    // 情報統合も1回のCron実行につきGeminiを1回だけ呼び、最大3回まで次回Cronで再試行する。
-    const attempts = Number(progress.merge_attempts || 0) + 1;
-    const terminal = attempts >= 3;
-    const message = error instanceof Error ? error.message : String(error);
-    const retryProgress = {
-      ...progress,
-      status: "completed",
-      merge_status: terminal ? "failed" : "retry_pending",
-      merge_attempts: attempts,
-      merge_error: message.slice(0, 1800),
-      merge_error_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    await saveProgress(
-      jobId,
-      spotName,
-      "completed",
-      results,
-      retryProgress,
-      executionId,
-      lockToken,
-      { status: terminal ? "failed" : "pending" },
-    );
-    return jsonResponse({
-      success: true,
-      mode: "merge",
-      facility_status: terminal ? "failed" : "retry_pending",
-      attempt: attempts,
-      max_attempts: 3,
-      error: message.slice(0, 500),
-    });
-  }
+  const aiResult = await callGemini(MODEL, makeMergePrompt(spotName, inputText), 90000);
 
   const allowedDecisions = new Set(["accepted", "rejected", "review_required"]);
   const decision = allowedDecisions.has(String(aiResult?.decision)) ? String(aiResult.decision) : "review_required";
@@ -1017,6 +947,14 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
   });
 }
 
+async function readWorkerResponse(response: Response): Promise<any> {
+  const result = await response.json();
+  if (!response.ok || result?.success === false || result?.error) {
+    throw new Error(String(result?.error || result?.detail || `Worker処理に失敗しました (HTTP ${response.status})`));
+  }
+  return result;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "POST only" }, 405);
@@ -1043,10 +981,26 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "有効なexecution_idとlock_tokenが必要です。" }, 400);
     }
 
-    if (mode === "start") return await handleStart(jobId, spotName, false, executionId, lockToken);
-    if (mode === "continue") return await handleContinue(jobId, spotName, executionId, lockToken);
-    if (mode === "merge") return await handleMerge(jobId, spotName, executionId, lockToken);
-    return jsonResponse({ error: "modeはstart / continue / mergeのいずれかを指定してください。" }, 400);
+    if (mode !== "process") {
+      return jsonResponse({ error: "modeはprocessを指定してください。" }, 400);
+    }
+
+    // 施設1件について、関連性評価の全バッチと情報統合を同じEdge Function実行内で完了する。
+    // Cronをまたぐ途中再開・自動再試行は行わない。
+    let state = await readWorkerResponse(
+      await handleStart(jobId, spotName, false, executionId, lockToken),
+    );
+    if (state.mode === "skipped") return jsonResponse(state);
+
+    while (state.next_action === "continue") {
+      state = await readWorkerResponse(
+        await handleContinue(jobId, spotName, executionId, lockToken),
+      );
+    }
+    if (state.next_action !== "merge") {
+      throw new Error("関連性評価の処理状態が不正です。");
+    }
+    return await handleMerge(jobId, spotName, executionId, lockToken);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("統合Worker処理エラー:", message);
