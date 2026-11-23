@@ -66,16 +66,43 @@ Deno.serve(async (req: Request) => {
 
     let pagesCompleted = 0;
     for (const page of (pages ?? [])) {
-      // ②で保存済みの施設名候補を再抽出・再評価しない。
-      // URL単位の工程完了だけを記録する。候補名と関連ページの確定は
-      // ④の施設名一覧・ページ照合処理で行う。
+      // ②で抽出済みの施設名候補を読み、Geminiを使わず施設名単位に整理する。
+      const { data: pageCandidates, error: pageCandidatesError } = await supabase
+        .from("spot_import_page_candidates")
+        .select("name")
+        .eq("job_id", jobId)
+        .eq("source_url_id", page.id)
+        .order("extraction_order", { ascending: true });
+      if (pageCandidatesError) throw pageCandidatesError;
+
+      const seenOnPage = new Set<string>();
+      const candidates = (pageCandidates ?? [])
+        .map((row: { name: string }) => cleanString(row.name))
+        .filter((name: string) => {
+          if (!name || seenOnPage.has(name)) return false;
+          seenOnPage.add(name);
+          return true;
+        })
+        .map((name: string) => ({
+          name,
+          address: null,
+          official_url: null,
+          description: null,
+          best_season: null,
+          catch_copy: null,
+          top_reason: null,
+          highlight_points: [],
+          tags: [],
+          raw_data: { source: "page_extraction" },
+        }));
+
       const { error: commitError } = await supabase.rpc("worker_commit_analysis_batch", {
         p_job_id: jobId,
         p_execution_id: executionId,
         p_lock_token: lockToken,
         p_url_id: page.id,
         p_success: true,
-        p_candidates: [],
+        p_candidates: candidates,
         p_error: null,
       });
       if (commitError) throw commitError;
@@ -94,10 +121,10 @@ Deno.serve(async (req: Request) => {
     const seenNames = new Set<string>();
     for (let offset = 0; ; offset += 1000) {
       const { data: candidateRows, error: candidateError } = await supabase
-        .from("spot_import_page_candidates")
-        .select("name,extraction_order")
+        .from("spot_import_candidates")
+        .select("name")
         .eq("job_id", jobId)
-        .order("extraction_order", { ascending: true })
+        .order("name", { ascending: true })
         .range(offset, offset + 999);
       if (candidateError) throw candidateError;
       for (const row of candidateRows ?? []) {
