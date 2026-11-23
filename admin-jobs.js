@@ -112,6 +112,83 @@ async function loadJobs() {
   }
 
   jobs.forEach(job => jobList.append(renderJob(job)));
+  if (jobIsSystemAdmin) await loadFacilityErrors(jobs);
+}
+
+async function loadFacilityErrors(jobs) {
+  const redesignJobIds = jobs
+    .filter(job => job.pipeline_version === "redesign_v1")
+    .map(job => job.id);
+  if (!redesignJobIds.length) return;
+
+  const { data, error } = await adminSupabase
+    .from("spot_import_merged_v2")
+    .select("id,job_id,spot_name,status,relevance_status,relevance_progress,error_message")
+    .in("job_id", redesignJobIds)
+    .or("status.eq.failed,relevance_status.eq.failed")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("loadFacilityErrors:", error);
+    jobList.append(makeText(
+      "p",
+      "施設単位のエラー一覧を読み込めませんでした。",
+      "job-error"
+    ));
+    return;
+  }
+
+  if (!Array.isArray(data) || data.length === 0) return;
+
+  const panel = document.createElement("section");
+  panel.className = "panel";
+  panel.append(makeText("h2", "施設単位のエラー（システム管理者専用）"));
+  panel.append(makeText(
+    "p",
+    "失敗した施設だけを再開できます。再開時は保存済みの正常な進捗を保持します。",
+    "help-text"
+  ));
+
+  data.forEach(candidate => {
+    const card = document.createElement("article");
+    card.className = "job-card";
+    const progress = candidate.relevance_progress || {};
+    const retryKind = candidate.relevance_status === "failed" ||
+      progress.status === "failed" ? "ABCD評価" : "情報統合";
+    const errorText = retryKind === "ABCD評価"
+      ? (progress.last_error || candidate.error_message || "詳細なエラー情報はありません。")
+      : (progress.merge_error || candidate.error_message || "詳細なエラー情報はありません。");
+
+    card.append(makeText("strong", candidate.spot_name));
+    card.append(makeText("p", "失敗工程：" + retryKind));
+    card.append(makeText("p", "エラー：" + String(errorText).slice(0, 500), "job-error"));
+
+    const actions = document.createElement("div");
+    actions.className = "job-actions";
+    actions.append(makeActionButton("この施設を再開", async button => {
+      if (!window.confirm(
+        "「" + candidate.spot_name + "」の" + retryKind +
+        "を再開しますか？保存済みの正常な進捗は保持されます。"
+      )) return;
+      button.disabled = true;
+      const { data: result, error: retryError } = await adminSupabase.rpc(
+        "admin_retry_spot_import_facility",
+        { p_candidate_id: candidate.id }
+      );
+      button.disabled = false;
+      if (retryError) {
+        jobMessage.textContent = explainJobError(retryError);
+        return;
+      }
+      jobMessage.textContent = "「" + candidate.spot_name + "」の再開を登録しました。";
+      console.info("admin_retry_spot_import_facility:", result);
+      await loadJobs();
+    }));
+    card.append(actions);
+    panel.append(card);
+  });
+
+  jobList.append(panel);
 }
 
 function renderJob(job) {
