@@ -55,7 +55,7 @@ function safeErrorFields(error: unknown) {
   };
 }
 
-type MergeTask = { spot_name: string; mode: "process" } | null;
+type MergeTask = { spot_name: string; mode: "process" | "start" | "continue" | "merge" } | null;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
