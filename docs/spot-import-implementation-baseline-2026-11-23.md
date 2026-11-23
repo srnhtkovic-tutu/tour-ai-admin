@@ -4,9 +4,13 @@
 - 保存先ブランチ: `feature/spot-import-redesign-2026-11`
 - 対象Supabase project ref: `fugibstqzkmzplqrpovn`
 - 目的: 新設計への改修前に、現在デプロイされているEdge FunctionのソースをGitHubに保全する。
+- 原本保存先: `docs/legacy-edge-functions/`（Supabaseから取得した未改変スナップショット）
+- 作業用ソース: `supabase/functions/`（新設計に合わせた改修対象）
 - 注意: このフォルダのコードは取得時点の現行コードのスナップショットであり、新設計への改修はまだ加えていない。Supabase本番環境には変更を加えていない。
 
 ## 保存したFunction
+
+原本は `docs/legacy-edge-functions/` に別途保全し、作業用ファイルを変更しても原本を上書きしない。
 
 - `supabase/functions/spot-import-dispatcher/index.ts` — Supabase version 14, 20645 chars
 - `supabase/functions/collect-spot-import-urls-worker-v2/index.ts` — Supabase version 7, 13847 chars
@@ -23,3 +27,5 @@
 5. 現行の80,000文字選定は上限超過ページをスキップして後続ページを続ける。新設計は最初に収まらないページが出た時点で選定を終了する。
 6. 現行の住所取得は候補テーブルから行っている。新設計ではA/B/Cページ本文からGeminiが確認できた住所を取得する。
 7. 本番DB・本番Edge Functions・Cronには変更を加えていない。
+8. DB適用済みマイグレーション25件を `supabase/migrations/` に同期し、旧ブランチの未適用・別バージョンSQL 10件は `docs/legacy-migrations/` に保全した。
+9. `20261123150000_spot_import_redesign_phase1.sql` は作業ブランチ上の未適用SQLであり、本番DBには適用していない。
