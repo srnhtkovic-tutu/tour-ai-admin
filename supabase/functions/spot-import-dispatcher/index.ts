@@ -64,10 +64,6 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-function normalizeName(value: string): string {
-  return value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
-}
-
 async function callRpc(name: string, args: Record<string, unknown>) {
   const { data, error } = await supabase.rpc(name, args);
   if (error) throw error;
@@ -75,15 +71,15 @@ async function callRpc(name: string, args: Record<string, unknown>) {
 }
 
 async function getNextMergeTask(jobId: string): Promise<MergeTask> {
+  // 施設名はページ抽出結果の保存順で取得し、文字列完全一致だけで重複を除外する。
   const candidateRows: any[] = [];
   const candidatePageSize = 1000;
   for (let offset = 0; ; offset += candidatePageSize) {
     const { data, error } = await supabase
-      .from("spot_import_candidates")
-      .select("name")
+      .from("spot_import_page_candidates")
+      .select("name,extraction_order")
       .eq("job_id", jobId)
-      .order("name", { ascending: true })
-      .order("id", { ascending: true })
+      .order("extraction_order", { ascending: true })
       .range(offset, offset + candidatePageSize - 1);
     if (error) throw error;
     candidateRows.push(...(data ?? []));
@@ -93,30 +89,10 @@ async function getNextMergeTask(jobId: string): Promise<MergeTask> {
   const names: string[] = [];
   const seen = new Set<string>();
   for (const row of candidateRows) {
-    const name = String(row.name ?? "").trim();
-    const key = normalizeName(name);
-    if (!name || seen.has(key)) continue;
-    seen.add(key);
+    const name = String(row.name ?? "");
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
     names.push(name);
-  }
-
-  // job_idでページ候補を一括ページングし、施設名との照合はメモリ上で行う。
-  // 施設名100件ずつの.in()検索を繰り返す方式を避け、DBアクセス回数を抑える。
-  const pageCandidateNames = new Set<string>();
-  const pageCandidatePageSize = 1000;
-  for (let offset = 0; ; offset += pageCandidatePageSize) {
-    const { data, error } = await supabase
-      .from("spot_import_page_candidates")
-      .select("name")
-      .eq("job_id", jobId)
-      .order("id", { ascending: true })
-      .range(offset, offset + pageCandidatePageSize - 1);
-    if (error) throw error;
-    for (const row of data ?? []) {
-      const name = String(row.name ?? "");
-      if (name) pageCandidateNames.add(name);
-    }
-    if (!data || data.length < pageCandidatePageSize) break;
   }
 
   const mergedRows: any[] = [];
@@ -124,57 +100,29 @@ async function getNextMergeTask(jobId: string): Promise<MergeTask> {
   for (let offset = 0; ; offset += mergedPageSize) {
     const { data, error } = await supabase
       .from("spot_import_merged_v2")
-      .select("spot_name,status,merged_data,relevance_status,relevance_progress")
+      .select("spot_name,status,merged_data,relevance_status,relevance_results,relevance_progress")
       .eq("job_id", jobId)
-      .order("spot_name", { ascending: true })
+      .order("created_at", { ascending: true })
       .range(offset, offset + mergedPageSize - 1);
     if (error) throw error;
     mergedRows.push(...(data ?? []));
     if (!data || data.length < mergedPageSize) break;
   }
 
+  // spot_import_merged_v2には(job_id, spot_name)の一意制約がある。
+  // 表記揺れをまとめず、施設名の文字列をそのままキーにする。
   const mergedByName = new Map<string, any>();
-  for (const row of mergedRows) mergedByName.set(normalizeName(row.spot_name), row);
+  for (const row of mergedRows) mergedByName.set(String(row.spot_name ?? ""), row);
 
   for (const spotName of names) {
-    const row = mergedByName.get(normalizeName(spotName));
+    const row = mergedByName.get(spotName);
     if (row?.status === "skipped" || row?.relevance_status === "skipped") continue;
-
-    if (!pageCandidateNames.has(spotName) && !row) {
-      const skippedAt = new Date().toISOString();
-      const skipReason = "ページ候補テーブルに完全一致する候補名がないため、今回の統合対象からスキップしました。";
-      const { error: skipError } = await supabase
-        .from("spot_import_merged_v2")
-        .insert({
-          job_id: jobId,
-          spot_name: spotName,
-          status: "skipped",
-          error_message: skipReason,
-          relevance_status: "skipped",
-          relevance_progress: {
-            job_id: jobId,
-            spot_name: spotName,
-            status: "skipped",
-            skip_reason: "no_exact_page_candidate",
-            reason: skipReason,
-            skipped_at: skippedAt,
-          },
-        });
-      if (skipError) throw skipError;
-      logEvent("dispatcher.merge_candidate_skipped", {
-        job_id: jobId,
-        spot_name: spotName,
-        reason: "no_exact_page_candidate",
-        skipped_at: skippedAt,
-      });
-      continue;
-    }
 
     if (!row) return { spot_name: spotName, mode: "start" };
 
-    if (row.status === "failed" || row.relevance_status === "failed") {
-      throw new Error(`スポット「${spotName}」の統合処理が失敗状態です。管理者による確認が必要です。`);
-    }
+    // 施設単位のエラーはこのジョブ全体を止めず、後続施設へ進む。
+    // 管理者が再開を指示した場合はstatus/relevance_statusを戻して再びキューに載せる。
+    if (row.status === "failed" || row.relevance_status === "failed") continue;
 
     if (row.merged_data && row.relevance_progress?.merged_at) continue;
 
@@ -445,7 +393,7 @@ Deno.serve(async (req: Request) => {
       ? stage
       : ({
           url_collection: "page_extraction",
-          page_extraction: "candidate_analysis",
+          page_extraction: "information_merge",
           candidate_analysis: "information_merge",
           information_merge: null,
         } as Record<string, string | null>)[stage];
