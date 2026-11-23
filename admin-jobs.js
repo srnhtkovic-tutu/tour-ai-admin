@@ -165,17 +165,17 @@ async function loadFacilityErrors(jobs) {
 
     const actions = document.createElement("div");
     actions.className = "job-actions";
-    actions.append(makeActionButton("この施設を再開", async button => {
+    const retryButton = makeActionButton("この施設を再開", async () => {
       if (!window.confirm(
         "「" + candidate.spot_name + "」の" + retryKind +
         "を再開しますか？保存済みの正常な進捗は保持されます。"
       )) return;
-      button.disabled = true;
+      retryButton.disabled = true;
       const { data: result, error: retryError } = await adminSupabase.rpc(
         "admin_retry_spot_import_facility",
         { p_candidate_id: candidate.id }
       );
-      button.disabled = false;
+      retryButton.disabled = false;
       if (retryError) {
         jobMessage.textContent = explainJobError(retryError);
         return;
@@ -183,7 +183,8 @@ async function loadFacilityErrors(jobs) {
       jobMessage.textContent = "「" + candidate.spot_name + "」の再開を登録しました。";
       console.info("admin_retry_spot_import_facility:", result);
       await loadJobs();
-    }));
+    });
+    actions.append(retryButton);
     card.append(actions);
     panel.append(card);
   });
