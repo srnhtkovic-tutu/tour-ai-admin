@@ -121,7 +121,18 @@ begin
         and u.crawl_status = 'fetched'
         and u.candidate_extraction_status = 'pending'
         and u.processing_execution_id is null
-      order by u.fetched_order asc nulls last, u.created_at asc, u.id asc
+      -- redesign_v1は実際の取得順、legacy_v1は従来のpriority順を維持する。
+      order by
+        case
+          when (select j.pipeline_version from public.spot_import_jobs j where j.id = p_job_id) = 'redesign_v1'
+          then u.fetched_order
+        end asc nulls last,
+        case
+          when (select j.pipeline_version from public.spot_import_jobs j where j.id = p_job_id) = 'legacy_v1'
+          then u.priority
+        end desc,
+        u.created_at asc,
+        u.id asc
       limit p_limit
       for update skip locked
     )
