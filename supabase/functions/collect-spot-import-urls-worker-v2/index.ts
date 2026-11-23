@@ -9,8 +9,8 @@ const corsHeaders = {
 const MAX_HTML_LENGTH = 500_000;
 const MAX_TEXT_LENGTH = 12_000;
 const MAX_PAGES_PER_RUN = 5;
-const MAX_SITEMAP_FILES = 10;
-const MAX_SITEMAP_URLS = 1_999;
+const MAX_SITEMAPS_PER_RUN = 1;
+const MAX_LOCATIONS_PER_SITEMAP = 10_000;
 const MAX_DISCOVERED_LINKS_PER_PAGE = 500;
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -59,29 +59,43 @@ function isLikelyHtmlPage(value: string): boolean {
   }
 }
 
-async function fetchDocument(url: string): Promise<{ body: string; contentType: string }> {
-  const response = await fetch(url, {
-    headers: {
-      "User-Agent": "TabitsuzukiSpotImporter/2.0",
-      "Accept": "text/html,application/xml,text/xml,text/plain,*/*;q=0.5",
-    },
-    signal: AbortSignal.timeout(8_000),
-    redirect: "manual",
-  });
+async function fetchDocument(
+  url: string,
+  allowedHosts: Set<string>,
+): Promise<{ body: string; contentType: string; finalUrl: string }> {
+  let currentUrl = normalizeUrl(url, allowedHosts);
+  if (!currentUrl) throw new Error("許可されていない取得URLです。");
 
-  if (response.status >= 300 && response.status < 400) {
-    throw new Error("リダイレクト先は自動取得しません。");
+  for (let redirects = 0; redirects <= 5; redirects++) {
+    const response = await fetch(currentUrl, {
+      headers: {
+        "User-Agent": "TabitsuzukiSpotImporter/2.1",
+        "Accept": "text/html,application/xml,text/xml,text/plain,*/*;q=0.5",
+      },
+      signal: AbortSignal.timeout(8_000),
+      redirect: "manual",
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("リダイレクト先URLがありません。");
+      if (redirects === 5) throw new Error("リダイレクト回数が上限を超えました。");
+      const nextUrl = normalizeUrl(location, allowedHosts, currentUrl);
+      if (!nextUrl) throw new Error("許可ドメイン外またはHTTPS以外へのリダイレクトを拒否しました。");
+      currentUrl = nextUrl;
+      continue;
+    }
+    if (!response.ok) throw new Error(`取得失敗: HTTP ${response.status}`);
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!/(text\/html|xml|text\/plain)/i.test(contentType)) {
+      throw new Error("HTML/XML以外のファイルです。");
+    }
+    const body = await response.text();
+    if (body.length > MAX_HTML_LENGTH) throw new Error("ページが大きすぎます。");
+    return { body, contentType, finalUrl: currentUrl };
   }
-  if (!response.ok) throw new Error(`取得失敗: HTTP ${response.status}`);
-
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!/(text\/html|xml|text\/plain)/i.test(contentType)) {
-    throw new Error("HTML/XML以外のファイルです。");
-  }
-
-  const body = await response.text();
-  if (body.length > MAX_HTML_LENGTH) throw new Error("ページが大きすぎます。");
-  return { body, contentType };
+  throw new Error("リダイレクト処理を完了できませんでした。");
 }
 
 function extractText(html: string): string {
@@ -140,51 +154,30 @@ function extractSitemapLocations(xml: string, allowedHosts: Set<string>): string
   return urls;
 }
 
-async function collectSitemapUrls(rootUrl: string, allowedHosts: Set<string>): Promise<string[]> {
+async function collectSitemapSeeds(rootUrl: string, allowedHosts: Set<string>): Promise<string[]> {
   const root = new URL(rootUrl);
-  const queue = [
+  const seeds = new Set<string>([
     new URL("/sitemap.xml", root.origin).href,
     new URL("/sitemap_index.xml", root.origin).href,
-  ];
-  const seenSitemaps = new Set<string>();
-  const seenPages = new Set<string>();
+  ]);
 
   try {
     const robotsUrl = new URL("/robots.txt", root.origin).href;
-    const robots = await fetchDocument(robotsUrl);
+    const robots = await fetchDocument(robotsUrl, allowedHosts);
     for (const line of robots.body.split(/\r?\n/)) {
       const match = line.match(/^\s*Sitemap:\s*(\S+)/i);
       if (!match) continue;
-      const sitemapUrl = normalizeUrl(match[1], allowedHosts);
-      if (sitemapUrl) queue.unshift(sitemapUrl);
+      const sitemapUrl = normalizeUrl(match[1], allowedHosts, robots.finalUrl);
+      if (sitemapUrl) seeds.add(sitemapUrl);
     }
   } catch (error) {
     console.log("robots.txt取得を省略:", String(error));
   }
+  return [...seeds];
+}
 
-  let sitemapCount = 0;
-  while (queue.length > 0 && sitemapCount < MAX_SITEMAP_FILES && seenPages.size < MAX_SITEMAP_URLS) {
-    const sitemapUrl = queue.shift()!;
-    if (seenSitemaps.has(sitemapUrl)) continue;
-    seenSitemaps.add(sitemapUrl);
-    sitemapCount++;
-
-    try {
-      const result = await fetchDocument(sitemapUrl);
-      for (const url of extractSitemapLocations(result.body, allowedHosts)) {
-        if (/\.xml(?:$|\?)/i.test(new URL(url).pathname)) {
-          if (!seenSitemaps.has(url)) queue.push(url);
-          continue;
-        }
-        if (!isLikelyHtmlPage(url)) continue;
-        seenPages.add(url);
-        if (seenPages.size >= MAX_SITEMAP_URLS) break;
-      }
-    } catch (error) {
-      console.log("sitemap取得を省略:", sitemapUrl, String(error));
-    }
-  }
-  return [...seenPages];
+function isSitemapUrl(value: string): boolean {
+  return /\.xml(?:\.gz)?(?:$|\?)/i.test(new URL(value).pathname);
 }
 
 function isNotFound(error: unknown): boolean {
@@ -240,11 +233,11 @@ Deno.serve(async (req: Request) => {
 
     let initializedUrls = 0;
     if (!initialized) {
-      const sitemapUrls = await collectSitemapUrls(rootUrl, allowedHosts);
+      const sitemapSeeds = await collectSitemapSeeds(rootUrl, allowedHosts);
       const urls = [
-        { url: rootUrl, link_label: "開始ページ", crawl_depth: 0, priority: 100 },
-        ...sitemapUrls.slice(0, MAX_SITEMAP_URLS).map((url) => ({
-          url, discovered_from_url: rootUrl, link_label: "sitemap", crawl_depth: 1, priority: 50,
+        { url: rootUrl, kind: "page", link_label: "開始ページ", crawl_depth: 0, priority: 100 },
+        ...sitemapSeeds.map((url) => ({
+          url, kind: "sitemap", discovered_from_url: rootUrl, link_label: "sitemap",
         })),
       ];
       const { data, error } = await supabase.rpc("worker_initialize_url_collection", {
@@ -252,6 +245,46 @@ Deno.serve(async (req: Request) => {
       });
       if (error) throw error;
       initializedUrls = data ?? 0;
+    }
+
+    const { data: sitemapClaimed, error: sitemapClaimError } = await supabase.rpc("worker_claim_sitemap_batch", {
+      p_job_id: jobId, p_execution_id: executionId, p_lock_token: lockToken,
+      p_limit: MAX_SITEMAPS_PER_RUN,
+    });
+    if (sitemapClaimError) throw sitemapClaimError;
+
+    let sitemapsCompleted = 0;
+    let sitemapPagesAdded = 0;
+    let childSitemapsAdded = 0;
+    let sitemapsFailed = 0;
+
+    for (const sitemap of (sitemapClaimed ?? [])) {
+      try {
+        const document = await fetchDocument(sitemap.sitemap_url, allowedHosts);
+        const locations = extractSitemapLocations(document.body, allowedHosts);
+        if (locations.length > MAX_LOCATIONS_PER_SITEMAP) {
+          throw new Error(`サイトマップ内URL数が上限(${MAX_LOCATIONS_PER_SITEMAP})を超えました。`);
+        }
+        const childSitemaps = locations.filter((url) => isSitemapUrl(url));
+        const pageUrls = locations.filter((url) => !isSitemapUrl(url) && isLikelyHtmlPage(url));
+        const { data, error } = await supabase.rpc("worker_commit_sitemap", {
+          p_job_id: jobId, p_execution_id: executionId, p_lock_token: lockToken,
+          p_sitemap_id: sitemap.id, p_success: true,
+          p_page_urls: pageUrls.map((url) => ({ url })),
+          p_sitemap_urls: childSitemaps.map((url) => ({ url })),
+        });
+        if (error) throw error;
+        sitemapsCompleted++;
+        sitemapPagesAdded += Number(data?.pages_added ?? 0);
+        childSitemapsAdded += Number(data?.sitemaps_added ?? 0);
+      } catch (error) {
+        const { error: commitError } = await supabase.rpc("worker_commit_sitemap", {
+          p_job_id: jobId, p_execution_id: executionId, p_lock_token: lockToken,
+          p_sitemap_id: sitemap.id, p_success: false, p_error: String(error).slice(0, 1800),
+        });
+        if (commitError) throw commitError;
+        sitemapsFailed++;
+      }
     }
 
     const { data: claimed, error: claimError } = await supabase.rpc("worker_claim_url_batch", {
@@ -273,7 +306,7 @@ Deno.serve(async (req: Request) => {
         const safeUrl = normalizeUrl(item.url, allowedHosts);
         if (!safeUrl) throw new Error("許可されていないURLです。");
 
-        const page = await fetchDocument(safeUrl);
+        const page = await fetchDocument(safeUrl, allowedHosts);
         if (!page.contentType.toLowerCase().includes("text/html")) {
           const { error } = await supabase.rpc("worker_commit_crawl_page", {
             p_job_id: jobId, p_execution_id: executionId, p_lock_token: lockToken,
@@ -330,17 +363,23 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const [pendingResult, retryResult, processingResult] = await Promise.all([
+    const [pendingResult, retryResult, processingResult, pendingSitemapResult, retrySitemapResult] = await Promise.all([
       supabase.from("spot_import_urls").select("id", { count: "exact", head: true })
         .eq("job_id", jobId).eq("crawl_status", "pending"),
       supabase.from("spot_import_urls").select("id", { count: "exact", head: true })
         .eq("job_id", jobId).eq("crawl_status", "failed").lt("retry_count", 2),
       supabase.from("spot_import_urls").select("id", { count: "exact", head: true })
         .eq("job_id", jobId).eq("crawl_status", "processing"),
+      supabase.schema("private").from("spot_import_sitemaps").select("id", { count: "exact", head: true })
+        .eq("job_id", jobId).eq("status", "pending"),
+      supabase.schema("private").from("spot_import_sitemaps").select("id", { count: "exact", head: true })
+        .eq("job_id", jobId).eq("status", "failed").lt("retry_count", 2),
     ]);
     if (pendingResult.error) throw pendingResult.error;
     if (retryResult.error) throw retryResult.error;
     if (processingResult.error) throw processingResult.error;
+    if (pendingSitemapResult.error) throw pendingSitemapResult.error;
+    if (retrySitemapResult.error) throw retrySitemapResult.error;
 
     return jsonResponse({
       job_id: jobId,
@@ -351,10 +390,18 @@ Deno.serve(async (req: Request) => {
       pages_failed: failed,
       pages_skipped: skipped,
       new_urls_added: added,
+      sitemaps_claimed: sitemapClaimed?.length ?? 0,
+      sitemaps_completed: sitemapsCompleted,
+      sitemaps_failed: sitemapsFailed,
+      sitemap_pages_added: sitemapPagesAdded,
+      child_sitemaps_added: childSitemapsAdded,
+      pending_sitemaps: pendingSitemapResult.count ?? 0,
+      retryable_failed_sitemaps: retrySitemapResult.count ?? 0,
       pending_urls: pendingResult.count ?? 0,
       retryable_failed_urls: retryResult.count ?? 0,
       processing_urls: processingResult.count ?? 0,
-      has_more_work: (pendingResult.count ?? 0) > 0 || (retryResult.count ?? 0) > 0,
+      has_more_work: (pendingResult.count ?? 0) > 0 || (retryResult.count ?? 0) > 0
+        || (pendingSitemapResult.count ?? 0) > 0 || (retrySitemapResult.count ?? 0) > 0,
     });
   } catch (error) {
     console.error("URL収集Workerエラー:", error);
