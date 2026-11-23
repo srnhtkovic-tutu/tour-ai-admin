@@ -91,17 +91,20 @@ Deno.serve(async (req: Request) => {
       .eq("analysis_status", "pending");
     if (remainingError) throw remainingError;
 
-    const { data: candidateRows, error: candidateError } = await supabase
-      .from("spot_import_page_candidates")
-      .select("name,extraction_order")
-      .eq("job_id", jobId)
-      .order("extraction_order", { ascending: true });
-    if (candidateError) throw candidateError;
-
     const seenNames = new Set<string>();
-    for (const row of candidateRows ?? []) {
-      const name = cleanString(row.name);
-      if (name) seenNames.add(name);
+    for (let offset = 0; ; offset += 1000) {
+      const { data: candidateRows, error: candidateError } = await supabase
+        .from("spot_import_page_candidates")
+        .select("name,extraction_order")
+        .eq("job_id", jobId)
+        .order("extraction_order", { ascending: true })
+        .range(offset, offset + 999);
+      if (candidateError) throw candidateError;
+      for (const row of candidateRows ?? []) {
+        const name = cleanString(row.name);
+        if (name) seenNames.add(name);
+      }
+      if (!candidateRows || candidateRows.length < 1000) break;
     }
 
     return jsonResponse({
