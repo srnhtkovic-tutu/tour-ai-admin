@@ -55,7 +55,7 @@ function safeErrorFields(error: unknown) {
   };
 }
 
-type MergeTask = { spot_name: string; mode: "start" | "continue" | "merge" } | null;
+type MergeTask = { spot_name: string; mode: "process" } | null;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -68,6 +68,51 @@ async function callRpc(name: string, args: Record<string, unknown>) {
   const { data, error } = await supabase.rpc(name, args);
   if (error) throw error;
   return data;
+}
+
+async function markMergeTimeoutSkipped(jobId: string, spotName: string, detail: string) {
+  const now = new Date().toISOString();
+  const reason = "情報統合WorkerのEdge Function実行時間上限に達したため、この施設をスキップしました。";
+  const { data: existing, error: findError } = await supabase
+    .from("spot_import_merged_v2")
+    .select("id,relevance_progress")
+    .eq("job_id", jobId)
+    .eq("spot_name", spotName)
+    .maybeSingle();
+  if (findError) throw findError;
+
+  const progress = {
+    ...(existing?.relevance_progress && typeof existing.relevance_progress === "object"
+      ? existing.relevance_progress
+      : {}),
+    job_id: jobId,
+    spot_name: spotName,
+    status: "skipped",
+    skip_reason: "edge_function_timeout",
+    reason,
+    timeout_detail: detail.slice(0, 1000),
+    skipped_at: now,
+  };
+  const values = {
+    status: "skipped",
+    relevance_status: "skipped",
+    error_message: reason,
+    relevance_progress: progress,
+    updated_at: now,
+  };
+
+  if (existing) {
+    const { error } = await supabase
+      .from("spot_import_merged_v2")
+      .update(values)
+      .eq("id", existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("spot_import_merged_v2")
+      .insert({ job_id: jobId, spot_name: spotName, ...values });
+    if (error) throw error;
+  }
 }
 
 async function getNextMergeTask(jobId: string): Promise<MergeTask> {
@@ -118,27 +163,15 @@ async function getNextMergeTask(jobId: string): Promise<MergeTask> {
     const row = mergedByName.get(spotName);
     if (row?.status === "skipped" || row?.relevance_status === "skipped") continue;
 
-    if (!row) return { spot_name: spotName, mode: "start" };
+    if (!row) return { spot_name: spotName, mode: "process" };
 
-    // 施設単位のエラーはこのジョブ全体を止めず、後続施設へ進む。
-    // 管理者が再開を指示した場合はstatus/relevance_statusを戻して再びキューに載せる。
-    if (row.status === "failed" || row.relevance_status === "failed") continue;
-
+    // 完了・スキップ済みだけを通過する。失敗や途中状態は自動再開せず異常停止する。
+    if (row.status === "failed" || row.relevance_status === "failed") {
+      throw new Error(`スポット「${spotName}」の情報統合が失敗状態です。管理者による確認が必要です。`);
+    }
     if (row.merged_data && row.relevance_progress?.merged_at) continue;
 
-    if (row.relevance_status === "completed") {
-      return { spot_name: spotName, mode: "merge" };
-    }
-
-    if (row.relevance_progress?.sources && Array.isArray(row.relevance_progress.sources)) {
-      return { spot_name: spotName, mode: "continue" };
-    }
-
-    if (!row.relevance_progress && (!row.relevance_results || row.relevance_results.length === 0)) {
-      return { spot_name: spotName, mode: "start" };
-    }
-
-    throw new Error(`スポット「${spotName}」の統合進捗データを確認できません。管理者による確認が必要です。`);
+    throw new Error(`スポット「${spotName}」に未完了の統合データが残っています。自動再開は行いません。`);
   }
 
   return null;
@@ -452,26 +485,34 @@ Deno.serve(async (req: Request) => {
           });
           workerResult = { raw_response: raw.slice(0, 1000) };
         }
-        if (!response.ok || workerResult?.success === false || workerResult?.error) {
+        if (response.status === 546 && pipelineVersion === "redesign_v1") {
+          // Supabase Edge Functionの実行時間上限(546)だけを施設単位スキップとして扱う。
+          // fetch例外、Geminiエラー、その他HTTPエラーは通常の異常停止とする。
+          await markMergeTimeoutSkipped(jobId, task.spot_name, raw);
+          logEvent("dispatcher.merge_facility_skipped_timeout", {
+            invocation_id: invocationId,
+            job_id: jobId,
+            execution_id: executionId,
+            spot_name: task.spot_name,
+            http_status: response.status,
+          });
+          workerResult = { success: true, facility_status: "skipped", reason: "edge_function_timeout" };
+        } else if (!response.ok || workerResult?.success === false || workerResult?.error) {
           throw new Error(`統合Workerエラー: ${JSON.stringify(workerResult).slice(0, 1200)}`);
         }
 
-        if (task.mode === "merge") {
-          let nextTask: MergeTask;
-          try {
-            nextTask = pipelineVersion === "redesign_v1"
-              ? await getNextMergeTask(jobId)
-              : await getNextMergeTaskLegacy(jobId);
-          } catch (error) {
-            const wrapped = new Error(`統合Worker完了後の次タスク確認中に失敗: ${safeLogText(error)}`);
-            (wrapped as Error & { cause?: unknown; context?: string }).cause = error;
-            (wrapped as Error & { cause?: unknown; context?: string }).context = "getNextMergeTask_after_worker";
-            throw wrapped;
-          }
-          hasMoreWork = nextTask !== null;
-        } else {
-          hasMoreWork = true;
+        let nextTask: MergeTask;
+        try {
+          nextTask = pipelineVersion === "redesign_v1"
+            ? await getNextMergeTask(jobId)
+            : await getNextMergeTaskLegacy(jobId);
+        } catch (error) {
+          const wrapped = new Error(`統合Worker完了後の次タスク確認中に失敗: ${safeLogText(error)}`);
+          (wrapped as Error & { cause?: unknown; context?: string }).cause = error;
+          (wrapped as Error & { cause?: unknown; context?: string }).context = "getNextMergeTask_after_worker";
+          throw wrapped;
         }
+        hasMoreWork = nextTask !== null;
       }
     } else {
       const workerStarted = performance.now();
