@@ -485,9 +485,13 @@ Deno.serve(async (req: Request) => {
           });
           workerResult = { raw_response: raw.slice(0, 1000) };
         }
-        if (response.status === 546 && pipelineVersion === "redesign_v1") {
-          // Supabase Edge Functionの実行時間上限(546)だけを施設単位スキップとして扱う。
-          // fetch例外、Geminiエラー、その他HTTPエラーは通常の異常停止とする。
+        const edgeFunctionTimedOut =
+          (response.status === 504 && /Request idle timeout limit/i.test(raw)) ||
+          (response.status === 546 && /wall clock time limit reached/i.test(raw));
+
+        if (edgeFunctionTimedOut && pipelineVersion === "redesign_v1") {
+          // Edge Functionの壁時計時間上限・リクエスト待機時間上限だけを施設単位スキップとする。
+          // CPU/メモリ等の546、fetch例外、Geminiエラー、その他HTTPエラーは通常の異常停止とする。
           await markMergeTimeoutSkipped(jobId, task.spot_name, raw);
           logEvent("dispatcher.merge_facility_skipped_timeout", {
             invocation_id: invocationId,
