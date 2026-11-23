@@ -572,7 +572,7 @@ Deno.serve(async (req: Request) => {
     const transitions: Record<string, string | null> = pipelineVersion === "redesign_v1"
       ? {
           url_collection: "page_extraction",
-          page_extraction: "information_merge",
+          page_extraction: "candidate_analysis",
           candidate_analysis: "information_merge",
           information_merge: null,
         }
