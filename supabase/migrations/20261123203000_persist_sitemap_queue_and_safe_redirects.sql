@@ -230,3 +230,22 @@ revoke all on function public.worker_claim_sitemap_batch(uuid,uuid,uuid,integer)
 revoke all on function public.worker_commit_sitemap(uuid,uuid,uuid,uuid,boolean,jsonb,jsonb,text) from public,anon,authenticated;
 grant execute on function public.worker_claim_sitemap_batch(uuid,uuid,uuid,integer) to service_role;
 grant execute on function public.worker_commit_sitemap(uuid,uuid,uuid,uuid,boolean,jsonb,jsonb,text) to service_role;
+
+create or replace function public.worker_get_sitemap_queue_counts(p_job_id uuid)
+returns table(pending_count bigint, retryable_failed_count bigint)
+language plpgsql
+security definer
+set search_path=''
+as $function$
+begin
+  if auth.role() <> 'service_role' then raise exception 'not_authorized'; end if;
+  return query
+  select
+    count(*) filter (where s.status='pending'),
+    count(*) filter (where s.status='failed' and s.retry_count < 2)
+  from private.spot_import_sitemaps s
+  where s.job_id=p_job_id;
+end;
+$function$;
+revoke all on function public.worker_get_sitemap_queue_counts(uuid) from public,anon,authenticated;
+grant execute on function public.worker_get_sitemap_queue_counts(uuid) to service_role;
