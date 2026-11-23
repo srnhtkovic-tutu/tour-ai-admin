@@ -7,6 +7,7 @@
 - `20261123101725_spot_import_redesign_phase1.sql`: Phase 1マイグレーション。2026-11-23に無料開発プロジェクトへ適用済み
 - `20261123102705_admin_only_facility_retry.sql`: 施設単位エラー再開をシステム管理者に限定するRPC。2026-11-23に無料開発プロジェクトへ適用済み
 - `20261123102825_expose_job_pipeline_version.sql`: ジョブ一覧RPCへpipeline_versionを追加。2026-11-23に無料開発プロジェクトへ適用済み
+- `20261123103234_add_spot_import_reevaluation_staging.sql`: 再評価結果の一時保存列とWorker専用保存RPCを追加。2026-11-23に無料開発プロジェクトへ適用済み
 
 ## 注意
 
