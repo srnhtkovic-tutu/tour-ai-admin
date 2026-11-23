@@ -138,7 +138,7 @@ function renderJob(job) {
     details.append(makeText("span", "要求中：" + actionLabel(job.requested_action)));
   }
   if (job.final_outcome) {
-    details.append(makeText("span", "最終結果：" + job.final_outcome));
+    details.append(makeText("span", "最終結果：" + finalOutcomeLabel(job.final_outcome)));
   }
   card.append(heading, details);
 
@@ -375,10 +375,25 @@ function statusLabel(status) {
   return labels[status] || status || "状態不明";
 }
 
+function finalOutcomeLabel(outcome) {
+  const labels = {
+    normal_completed: "正常完了",
+    partial_error: "一部エラーあり",
+    cancelled: "キャンセル"
+  };
+  return labels[outcome] || outcome || "未設定";
+}
+
 function stageLabel(stage) {
   const labels = {
-    url_collection: "URL収集", extraction: "情報抽出",
-    analysis: "分析", ai_merge: "AI統合", human_review: "人による審査"
+    url_collection: "URL収集",
+    page_extraction: "施設名抽出",
+    candidate_analysis: "旧候補詳細分析",
+    information_merge: "ABCD評価・情報統合",
+    human_review: "人による審査",
+    extraction: "情報抽出",
+    analysis: "分析",
+    ai_merge: "AI統合"
   };
   return labels[stage] || stage || "未設定";
 }
