@@ -34,10 +34,7 @@ type Source = {
   candidate_ids: string[];
   categories: string[];
   evidence_texts: string[];
-  priority: number;
-  priority_reason: string;
-  mention_count: number;
-  context_excerpt: string;
+  fetched_order: number;
   sent_to_gemini: boolean;
   relevance_class?: RelevanceClass;
   relevance_reason?: string;
@@ -231,47 +228,6 @@ function normalizeUrl(url: string): string {
   }
 }
 
-// ページの内容から、評価時に使う参考優先順位を判定する。
-function getPagePriority(source: {
-  page_title: string;
-  extracted_text: string;
-  spot_name: string;
-}) {
-  const title = source.page_title || "";
-  const text = source.extracted_text || "";
-  const spotName = source.spot_name || "";
-  const normalizeText = (value: string) => value.replace(/\s+/g, "").replace(/　/g, "");
-  const normalizedTitle = normalizeText(title);
-  const normalizedSpotName = normalizeText(spotName);
-  const titleMatchesSpot = normalizedSpotName.length > 0 && normalizedTitle.includes(normalizedSpotName);
-  const isEventPage = /イベント|祭り|まつり|体験|開催|参加募集|ワークショップ|ヨガ/.test(title);
-  const isFacilityInformation = /施設紹介|スポット紹介|観光案内|施設案内|インフォメーション|営業時間|利用案内|アクセス|料金|入館料/.test(title);
-  const contextExcerpts: string[] = [];
-  let mentionCount = 0;
-
-  if (spotName.length > 0) {
-    let searchPosition = 0;
-    while (searchPosition < text.length) {
-      const foundPosition = text.indexOf(spotName, searchPosition);
-      if (foundPosition === -1) break;
-      mentionCount++;
-      const start = Math.max(0, foundPosition - 180);
-      const end = Math.min(text.length, foundPosition + spotName.length + 180);
-      const excerpt = text.slice(start, end).trim();
-      if (contextExcerpts.length < 5 && !contextExcerpts.includes(excerpt)) contextExcerpts.push(excerpt);
-      searchPosition = foundPosition + spotName.length;
-    }
-  }
-
-  const contextExcerpt = contextExcerpts.join("\n---\n");
-  if (titleMatchesSpot && isFacilityInformation) return { priority: 110, reason: "対象スポットの個別紹介・施設情報", mentionCount, contextExcerpt };
-  if (titleMatchesSpot && isEventPage) return { priority: 60, reason: "対象スポットに関連するイベント・体験情報", mentionCount, contextExcerpt };
-  if (titleMatchesSpot) return { priority: 100, reason: "タイトルに対象スポット名を含むページ", mentionCount, contextExcerpt };
-  if (mentionCount > 0) return { priority: 40, reason: "本文中に対象スポット名あり・関連性の確認が必要", mentionCount, contextExcerpt };
-  if (isEventPage) return { priority: 30, reason: "イベント・体験情報", mentionCount, contextExcerpt };
-  return { priority: 10, reason: "その他の関連情報", mentionCount, contextExcerpt };
-}
-
 function parseGeminiJson(text: string) {
   const cleaned = text.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
   return JSON.parse(cleaned);
@@ -367,77 +323,82 @@ async function fetchAllRows(
 async function buildSources(jobId: string, spotName: string) {
   const candidates = await fetchAllRows((from, to) => supabase
     .from("spot_import_page_candidates")
-    .select("id, name, source_url_id")
+    .select("id, name, source_url_id, category, evidence_text")
     .eq("name", spotName)
     .eq("job_id", jobId)
-    .order("id", { ascending: true })
+    .order("extraction_order", { ascending: true })
     .range(from, to));
-  if (!candidates.length) throw new Error("指定されたジョブ内に該当する候補名が見つかりません。");
-
-  const titlePages = await fetchAllRows((from, to) => supabase
-    .from("spot_import_urls")
-    .select("id, url, page_title, extracted_text")
-    .eq("job_id", jobId)
-    .ilike("page_title", `%${spotName}%`)
-    .order("id", { ascending: true })
-    .range(from, to));
-
-  const textPages = await fetchAllRows((from, to) => supabase
-    .from("spot_import_urls")
-    .select("id, url, page_title, extracted_text")
-    .eq("job_id", jobId)
-    .ilike("extracted_text", `%${spotName}%`)
-    .order("id", { ascending: true })
-    .range(from, to));
-
-  const pageMap = new Map<string, any>();
-  for (const page of [...titlePages, ...textPages]) pageMap.set(page.id, page);
-  const pages = Array.from(pageMap.values());
-  if (!pages.length) throw new Error("指定されたジョブ内に候補名を含む関連ページが見つかりません。");
 
   const candidateIdsByPage = new Map<string, string[]>();
+  const categoriesByPage = new Map<string, string[]>();
+  const evidenceByPage = new Map<string, string[]>();
   for (const candidate of candidates) {
     if (!candidate.source_url_id) continue;
-    const ids = candidateIdsByPage.get(candidate.source_url_id) || [];
-    ids.push(candidate.id);
-    candidateIdsByPage.set(candidate.source_url_id, ids);
+    const id = String(candidate.source_url_id);
+    const ids = candidateIdsByPage.get(id) || [];
+    ids.push(String(candidate.id));
+    candidateIdsByPage.set(id, ids);
+
+    const categories = categoriesByPage.get(id) || [];
+    if (typeof candidate.category === "string" && candidate.category.trim()) categories.push(candidate.category.trim());
+    categoriesByPage.set(id, categories);
+
+    const evidence = evidenceByPage.get(id) || [];
+    if (typeof candidate.evidence_text === "string" && candidate.evidence_text.trim()) evidence.push(candidate.evidence_text.trim());
+    evidenceByPage.set(id, evidence);
   }
+
+  const allPages = await fetchAllRows((from, to) => supabase
+    .from("spot_import_urls")
+    .select("id, url, page_title, extracted_text, fetched_order")
+    .eq("job_id", jobId)
+    .eq("crawl_status", "fetched")
+    .order("fetched_order", { ascending: true })
+    .range(from, to));
+
+  // 候補が抽出されたページに加え、タイトルまたは本文に施設名が完全な文字列として
+  // 含まれる収集済みページも対象にする。ILIKEのワイルドカード解釈は使わない。
+  const pages = allPages.filter((page: any) => {
+    const pageId = String(page.id);
+    const title = typeof page.page_title === "string" ? page.page_title : "";
+    const body = typeof page.extracted_text === "string" ? page.extracted_text : "";
+    return candidateIdsByPage.has(pageId) || title.includes(spotName) || body.includes(spotName);
+  });
 
   const sourceMap = new Map<string, Source>();
   for (const page of pages) {
-    const key = page.url ? normalizeUrl(page.url) : `no-url-${page.id}`;
-    const pageCandidateIds = candidateIdsByPage.get(page.id) || [];
-    const priorityInfo = getPagePriority({
-      page_title: page.page_title || "",
-      extracted_text: page.extracted_text || "",
-      spot_name: spotName,
-    });
+    const pageId = String(page.id);
+    const key = page.url ? normalizeUrl(page.url) : `no-url-${pageId}`;
+    const pageCandidateIds = candidateIdsByPage.get(pageId) || [];
+    const pageCategories = categoriesByPage.get(pageId) || [];
+    const pageEvidence = evidenceByPage.get(pageId) || [];
+
     if (sourceMap.has(key)) {
+      // URL重複時は、収集順で最初のページ本文を代表として保持する。
       const existing = sourceMap.get(key)!;
-      if (!existing.page_ids.includes(page.id)) existing.page_ids.push(page.id);
+      if (!existing.page_ids.includes(pageId)) existing.page_ids.push(pageId);
       for (const id of pageCandidateIds) if (!existing.candidate_ids.includes(id)) existing.candidate_ids.push(id);
+      for (const category of pageCategories) if (!existing.categories.includes(category)) existing.categories.push(category);
+      for (const evidence of pageEvidence) if (!existing.evidence_texts.includes(evidence)) existing.evidence_texts.push(evidence);
       continue;
     }
+
     sourceMap.set(key, {
       url: page.url || "",
       page_title: page.page_title || "",
       extracted_text: page.extracted_text || "",
-      page_ids: [page.id],
+      page_ids: [pageId],
       candidate_ids: [...new Set(pageCandidateIds)],
-      categories: [],
-      evidence_texts: [],
-      priority: priorityInfo.priority,
-      priority_reason: priorityInfo.reason,
-      mention_count: priorityInfo.mentionCount,
-      context_excerpt: priorityInfo.contextExcerpt,
+      categories: [...new Set(pageCategories)],
+      evidence_texts: [...new Set(pageEvidence)],
+      fetched_order: Number(page.fetched_order || 0),
       sent_to_gemini: false,
       used_for_merge: false,
     });
   }
-  const sources = Array.from(sourceMap.values()).sort((a, b) =>
-    b.priority !== a.priority ? b.priority - a.priority : a.extracted_text.length - b.extracted_text.length
-  );
-  return { candidates, pages, sources };
+
+  // sourceMapはfetched_order順に追加されているため、並べ替えず収集順を維持する。
+  return { candidates, pages, sources: Array.from(sourceMap.values()) };
 }
 
 function makeRelevancePrompt(spotName: string, batchItems: any[]) {
@@ -446,9 +407,7 @@ function makeRelevancePrompt(spotName: string, batchItems: any[]) {
     item_no: item.item_no,
     url: item.url,
     page_title: item.page_title,
-    priority: item.priority,
-    mention_count: item.mention_count,
-    context_excerpt: item.context_excerpt,
+    extracted_text: item.extracted_text,
   }));
   return `
 あなたは地域観光情報を調査・整理する専門家です。
@@ -574,7 +533,8 @@ review_required：訪問先である可能性はあるが、情報だけでは�
 - localRecommendationには、情報源から推薦主体または地域固有のエピソードが確認できる内容だけを記載してください。
 - 過去に掲載された観光コースやイベントを、現在も提供中・開催中であるかのように記載してはいけません。
 - recommendFood / recommendHistory / recommendRelax / recommendActivityは、旅行者の4つの目的に応じて後から利用できる情報材料です。情報がない目的は空文字で構いません。
-- 住所、電話番号、営業時間、定休日、緯度経度は、この出力形式では作らないでください。入力にない値を推測しないでください。
+- 住所は対象スポット自身の住所が入力本文に明記されている場合だけ、本文の表記をそのまま出力してください。周辺施設の住所、候補が複数ある住所、推測が必要な住所は空文字にしてください。
+- 電話番号、営業時間、定休日、緯度経度は出力しないでください。入力にない値を推測しないでください。
 - officialUrlは対象スポット自身の公式サイトと確認できる場合だけ記載してください。
 - 情報源URLやページタイトルをGeminiが新たに作らないでください。出典一覧はサーバー側で別途保存します。
 - 出力は日本語とし、JSON以外の文章を付けないでください。
@@ -635,6 +595,11 @@ function validateBatch(batchItems: any[], batchEvaluations: any[], batchNumber: 
   return normalized;
 }
 
+function countCharacters(value: string): number {
+  // 80,000文字はUTF-16コード単位ではなくUnicodeコードポイント数で数える。
+  return Array.from(value).length;
+}
+
 function normalizeGuideData(value: any): GuideData {
   const data = value && typeof value === "object" ? value : {};
   const asText = (v: any) => typeof v === "string" ? v.trim() : "";
@@ -667,17 +632,45 @@ async function handleStart(jobId: string, spotName: string, restart: boolean, ex
       progress: oldProgress,
     }, 409);
   }
+
   const { sources, candidates } = await buildSources(jobId, spotName);
+  const candidateIds = candidates.map((c: any) => String(c.id));
+  const sourceUrlIds = [...new Set(sources.flatMap((source: Source) => source.page_ids))];
+
+  if (sources.length === 0) {
+    const skippedAt = new Date().toISOString();
+    const skippedProgress = {
+      job_id: jobId,
+      spot_name: spotName,
+      status: "skipped",
+      total_pages: 0,
+      candidate_ids: candidateIds,
+      candidate_count: candidates.length,
+      skip_reason: "no_related_pages",
+      skipped_at: skippedAt,
+      updated_at: skippedAt,
+    };
+    await saveProgress(jobId, spotName, "skipped", [], skippedProgress, executionId, lockToken, {
+      status: "skipped",
+      sourceCount: 0,
+      inputCharCount: 0,
+      sourceCandidateIds: candidateIds,
+      sourceUrlIds,
+    });
+    return jsonResponse({ success: true, mode: "skipped", job_id: jobId, spot_name: spotName, reason: "no_related_pages" });
+  }
+
   const snapshot = sources.map((source) => ({ ...source }));
   const progress = {
     job_id: jobId,
     spot_name: spotName,
     status: "in_progress",
     total_pages: snapshot.length,
-    candidate_ids: candidates.map((c: any) => c.id),
+    candidate_ids: candidateIds,
     candidate_count: candidates.length,
     batch_size: RELEVANCE_BATCH_SIZE,
     next_batch: 0,
+    batch_attempts: 0,
     completed_batches: [],
     completed_page_ids: [],
     sources: snapshot,
@@ -720,25 +713,53 @@ async function handleContinue(jobId: string, spotName: string, executionId: stri
   const totalBatches = Math.ceil(sources.length / RELEVANCE_BATCH_SIZE);
   const batchIndex = Number(progress.next_batch || 0);
   if (batchIndex >= totalBatches) throw new Error("進捗データのnext_batchが不正です。");
+
   const items = sources.slice(batchIndex * RELEVANCE_BATCH_SIZE, (batchIndex + 1) * RELEVANCE_BATCH_SIZE).map((source, index) => ({
-    // バッチ内の連番。実際のpage_idはサーバー側だけで保持する。
     item_no: index + 1,
     page_id: source.page_ids[0],
     url: source.url,
     page_title: source.page_title,
-    priority: source.priority,
-    mention_count: source.mention_count,
-    context_excerpt: source.context_excerpt,
+    extracted_text: source.extracted_text,
   }));
-  console.log(`関連性評価バッチ ${batchIndex + 1}/${totalBatches} 開始`, items.length);
-  const data = await callGemini(RELEVANCE_MODEL, makeRelevancePrompt(spotName, items), 90000);
-  console.log(`関連性評価バッチ ${batchIndex + 1}/${totalBatches} 入力page_id`, items.map((item) => item.page_id));
-  console.log(`関連性評価バッチ ${batchIndex + 1}/${totalBatches} Gemini返却`, (data?.evaluations || []).map((item: any) => ({
-    item_no: item.item_no,
-    relevance_class: String(item.relevance_class || ""),
-  })));
 
-  const batchResults = validateBatch(items, data?.evaluations, batchIndex + 1);
+  let batchResults: any[];
+  try {
+    const data = await callGemini(RELEVANCE_MODEL, makeRelevancePrompt(spotName, items), 90000);
+    batchResults = validateBatch(items, data?.evaluations, batchIndex + 1);
+  } catch (error) {
+    // Geminiの再試行はCron実行をまたいで管理し、1回の実行時間を長くしすぎない。
+    const attempts = Number(progress.batch_attempts || 0) + 1;
+    const terminal = attempts >= 3;
+    const message = error instanceof Error ? error.message : String(error);
+    const failedProgress = {
+      ...progress,
+      status: terminal ? "failed" : "in_progress",
+      batch_attempts: attempts,
+      last_error: message.slice(0, 1800),
+      last_error_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    await saveProgress(
+      jobId,
+      spotName,
+      terminal ? "failed" : "in_progress",
+      row.relevance_results || [],
+      failedProgress,
+      executionId,
+      lockToken,
+      { status: terminal ? "failed" : "pending" },
+    );
+    return jsonResponse({
+      success: true,
+      mode: "continue",
+      facility_status: terminal ? "failed" : "retry_pending",
+      batch_number: batchIndex + 1,
+      attempt: attempts,
+      max_attempts: 3,
+      error: message.slice(0, 500),
+    });
+  }
+
   const normalized: RelevanceResult[] = batchResults.map((item: any) => {
     const source = sources.find((s) => s.page_ids[0] === String(item.page_id))!;
     return {
@@ -756,6 +777,8 @@ async function handleContinue(jobId: string, spotName: string, executionId: stri
   const updatedProgress = {
     ...progress,
     status: done ? "completed" : "in_progress",
+    batch_attempts: 0,
+    last_error: null,
     next_batch: batchIndex + 1,
     completed_batches: [...(progress.completed_batches || []), batchIndex + 1],
     completed_page_ids: [...completedIds],
@@ -799,6 +822,7 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
   if (progress.job_id !== jobId || progress.spot_name !== spotName) {
     throw new Error("保存された進捗のjob_idまたはspot_nameが一致しません。");
   }
+
   const sources: Source[] = progress.sources;
   const evalMap = new Map(results.map((r) => [r.page_id, r]));
   for (const source of sources) {
@@ -809,93 +833,126 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
     source.relevant_information = result.relevant_information;
     source.used_for_merge = ["A", "B", "C"].includes(result.relevance_class);
   }
-  const eligible = sources.filter((s) => s.used_for_merge).sort((a, b) => b.priority - a.priority);
-  if (!eligible.length) throw new Error("A・B・Cに分類されたページがありません。");
+
+  const rankOrder: Record<string, number> = { A: 0, B: 1, C: 2 };
+  const eligible = sources
+    .map((source, index) => ({ source, index }))
+    .filter(({ source }) => source.used_for_merge)
+    .sort((a, b) =>
+      rankOrder[String(a.source.relevance_class)] - rankOrder[String(b.source.relevance_class)] ||
+      a.index - b.index
+    )
+    .map(({ source }) => source);
+
+  const serializedSources = () => sources.map((s) => ({
+    page_ids: s.page_ids,
+    candidate_ids: s.candidate_ids,
+    url: s.url,
+    page_title: s.page_title,
+    categories: s.categories,
+    evidence_texts: s.evidence_texts,
+    relevance_class: s.relevance_class,
+    relevance_reason: s.relevance_reason,
+    relevant_information: s.relevant_information,
+    used_for_merge: s.used_for_merge,
+    sent_to_gemini: s.sent_to_gemini,
+  }));
+  const candidateIds = [...new Set<string>(progress.candidate_ids || [])];
+  const urlIds = [...new Set<string>(sources.flatMap((s) => s.page_ids))];
+
+  if (eligible.length === 0) {
+    const skippedAt = new Date().toISOString();
+    const skippedProgress = {
+      ...progress,
+      status: "skipped",
+      merge_status: "not_applicable",
+      skip_reason: "no_abc_pages",
+      skipped_at: skippedAt,
+      updated_at: skippedAt,
+    };
+    const savedId = await saveProgress(jobId, spotName, "skipped", results, skippedProgress, executionId, lockToken, {
+      status: "skipped",
+      sourceCount: 0,
+      inputCharCount: 0,
+      sourceCandidateIds: candidateIds,
+      sourceUrlIds: urlIds,
+      sources: serializedSources(),
+    });
+    return jsonResponse({
+      success: true,
+      mode: "merge",
+      facility_status: "skipped",
+      reason: "no_abc_pages",
+      saved_id: savedId,
+    });
+  }
 
   let inputText = "";
   let included = 0;
+  let bodyCharacterCount = 0;
   for (const source of eligible) {
-    const section = `\n【情報源 ${included + 1}】\n関連性分類: ${source.relevance_class}\n関連性の判定理由: ${source.relevance_reason}\n対象スポットに関係する情報: ${source.relevant_information}\n\n優先順位: ${source.priority}\nページ分類: ${source.priority_reason}\nページタイトル: ${source.page_title}\nURL: ${source.url}\n対象スポット名の本文中の登場回数: ${source.mention_count}\n\n【対象スポット名の前後の文章】\n${source.context_excerpt}\n\n【元ページ本文】\n${source.extracted_text}\n`;
-    if (inputText.length + section.length > MAX_INPUT_CHARS) continue;
+    const body = source.extracted_text || "";
+    const pageCharacters = countCharacters(body);
+    if (bodyCharacterCount + pageCharacters > MAX_INPUT_CHARS) {
+      // 本文を途中で切らず、最初に上限へ収まらないページが出た時点で選定を終了する。
+      break;
+    }
+    const section = `\n【情報源 ${included + 1}】\n分類: ${source.relevance_class}\nページタイトル: ${source.page_title}\nURL: ${source.url}\n【元ページ本文】\n${body}\n`;
     inputText += section;
+    bodyCharacterCount += pageCharacters;
     included++;
     source.sent_to_gemini = true;
   }
-  if (!inputText.trim()) throw new Error("Geminiに渡す情報がありません。");
-  console.log("詳細統合 Gemini送信ページ数", included, "文字数", inputText.length);
+  if (!inputText.trim() || included === 0) {
+    throw new Error("情報統合対象ページに利用できる本文がありません。");
+  }
 
-  const aiResult = await callGemini(MODEL, makeMergePrompt(spotName, inputText), 90000);
+  console.log("詳細統合 Gemini送信ページ数", included, "本文文字数", bodyCharacterCount);
+
+  let aiResult: any;
+  try {
+    aiResult = await callGemini(MODEL, makeMergePrompt(spotName, inputText), 90000);
+  } catch (error) {
+    // 情報統合も1回のCron実行につきGeminiを1回だけ呼び、最大3回まで次回Cronで再試行する。
+    const attempts = Number(progress.merge_attempts || 0) + 1;
+    const terminal = attempts >= 3;
+    const message = error instanceof Error ? error.message : String(error);
+    const retryProgress = {
+      ...progress,
+      status: "completed",
+      merge_status: terminal ? "failed" : "retry_pending",
+      merge_attempts: attempts,
+      merge_error: message.slice(0, 1800),
+      merge_error_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    await saveProgress(
+      jobId,
+      spotName,
+      "completed",
+      results,
+      retryProgress,
+      executionId,
+      lockToken,
+      { status: terminal ? "failed" : "pending" },
+    );
+    return jsonResponse({
+      success: true,
+      mode: "merge",
+      facility_status: terminal ? "failed" : "retry_pending",
+      attempt: attempts,
+      max_attempts: 3,
+      error: message.slice(0, 500),
+    });
+  }
+
   const allowedDecisions = new Set(["accepted", "rejected", "review_required"]);
   const decision = allowedDecisions.has(String(aiResult?.decision)) ? String(aiResult.decision) : "review_required";
   const decisionReason = typeof aiResult?.decisionReason === "string" ? aiResult.decisionReason : "判定理由が返されませんでした。人による確認が必要です。";
   const mergedName = typeof aiResult?.name === "string" && aiResult.name.trim() ? aiResult.name.trim() : spotName;
+  const address = typeof aiResult?.address === "string" ? aiResult.address.trim() : "";
   const guideData = normalizeGuideData(aiResult?.guide_data);
-  // 住所はAIに生成させず、元の候補テーブルから引き継ぐ。
-  // progress.candidate_ids は spot_import_page_candidates のIDなので、
-  // source_url_id を介して spot_import_candidates の住所と対応付ける。
-  const pageCandidateIds: string[] = Array.isArray(progress.candidate_ids)
-    ? [...new Set(progress.candidate_ids.filter((id: unknown) => typeof id === "string"))]
-    : [];
-  let pageCandidates: any[] = [];
-  if (pageCandidateIds.length > 0) {
-    for (let offset = 0; offset < pageCandidateIds.length; offset += 100) {
-      const idChunk = pageCandidateIds.slice(offset, offset + 100);
-      const rows = await fetchAllRows((from, to) => supabase
-        .from("spot_import_page_candidates")
-        .select("id, source_url_id")
-        .eq("job_id", jobId)
-        .eq("name", spotName)
-        .in("id", idChunk)
-        .order("id", { ascending: true })
-        .range(from, to));
-      pageCandidates.push(...rows);
-    }
-  } else {
-    pageCandidates = await fetchAllRows((from, to) => supabase
-      .from("spot_import_page_candidates")
-      .select("id, source_url_id")
-      .eq("job_id", jobId)
-      .eq("name", spotName)
-      .order("id", { ascending: true })
-      .range(from, to));
-  }
 
-  const sourceUrlIds = [...new Set(
-    pageCandidates
-      .map((candidate: any) => candidate.source_url_id)
-      .filter((id: unknown): id is string => typeof id === "string" && id.length > 0)
-  )];
-
-  let address = "";
-  if (sourceUrlIds.length > 0) {
-    const sourceCandidates: any[] = [];
-    for (let offset = 0; offset < sourceUrlIds.length; offset += 100) {
-      const urlChunk = sourceUrlIds.slice(offset, offset + 100);
-      const rows = await fetchAllRows((from, to) => supabase
-        .from("spot_import_candidates")
-        .select("address")
-        .eq("job_id", jobId)
-        .eq("name", spotName)
-        .in("source_url_id", urlChunk)
-        .order("source_url_id", { ascending: true })
-        .range(from, to));
-      sourceCandidates.push(...rows);
-    }
-
-    const distinctAddresses = [...new Set(
-      sourceCandidates
-        .map((candidate: any) => typeof candidate.address === "string" ? candidate.address.trim() : "")
-        .filter((value: string) => value.length > 0)
-    )];
-    if (distinctAddresses.length === 1) {
-      address = distinctAddresses[0];
-    } else if (distinctAddresses.length > 1) {
-      console.warn("住所候補が複数あり一致しないため、住所を自動引き継ぎしません:", jobId, spotName);
-    }
-  }
-
-  // 住所の統合後、審査前に住所から緯度・経度を取得する。
-  // 低精度・低一致度の座標は自動採用せず、審査担当者による確認に回す。
   const geocoding = await geocodeAddress(address);
   const mergedData = {
     decision,
@@ -908,45 +965,32 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
     guide_data: guideData,
   };
 
-  const resultSources = sources.map((s) => ({
-    page_ids: s.page_ids,
-    candidate_ids: s.candidate_ids,
-    url: s.url,
-    page_title: s.page_title,
-    categories: s.categories,
-    evidence_texts: s.evidence_texts,
-    priority: s.priority,
-    priority_reason: s.priority_reason,
-    mention_count: s.mention_count,
-    context_excerpt: s.context_excerpt,
-    relevance_class: s.relevance_class,
-    relevance_reason: s.relevance_reason,
-    relevant_information: s.relevant_information,
-    used_for_merge: s.used_for_merge,
-    sent_to_gemini: s.sent_to_gemini,
-  }));
-  const candidateIds = [...new Set<string>(progress.candidate_ids || [])];
-  const urlIds = [...new Set<string>(sources.flatMap((s) => s.page_ids))];
   const savedId = await saveProgress(
     jobId,
     spotName,
     "completed",
     results,
-    { ...progress, status: "completed", merged_at: new Date().toISOString() },
+    {
+      ...progress,
+      status: "completed",
+      merge_status: "completed",
+      merge_attempts: 0,
+      merge_error: null,
+      merged_at: new Date().toISOString(),
+    },
     executionId,
     lockToken,
     {
       status: "completed",
       sourceCount: included,
-      inputCharCount: inputText.length,
+      inputCharCount: bodyCharacterCount,
       sourceCandidateIds: candidateIds,
       sourceUrlIds: urlIds,
-      sources: resultSources,
+      sources: serializedSources(),
       mergedData,
       model: MODEL,
     },
   );
-
 
   return jsonResponse({
     success: true,
@@ -964,6 +1008,7 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
     },
     merge_eligible_pages: eligible.length,
     sent_pages: included,
+    input_char_count: bodyCharacterCount,
     merged_data: mergedData,
     saved_id: savedId,
     destination_table: TABLE_NAME,
