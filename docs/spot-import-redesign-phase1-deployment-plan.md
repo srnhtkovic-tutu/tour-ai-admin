@@ -1,8 +1,20 @@
-# スポット収集再設計 Phase 1 適用手順（未実施）
+# スポット収集再設計 Phase 1 適用手順・実施記録
 
-## 適用前提
+## 2026-11-23 無料開発プロジェクトへの適用記録
 
-このブランチのSQLとEdge Functionは未適用。テストとレビューが完了するまで本番へ適用しない。
+対象: Supabase project `fugibstqzkmzplqrpovn`
+
+- `merge-spot-information-v3-worker`: version 1でデプロイ済み。verify_jwt=false。Dispatcherから呼び出す前の段階でデプロイし、ソース一致を確認。
+- `spot-import-dispatcher`: version 15で二重経路対応版へ更新済み。verify_jwt=false。ソース一致を確認。
+- DBマイグレーション `20261123101725_spot_import_redesign_phase1`: 適用済み。
+- 既存6ジョブ: すべて `legacy_v1`。
+- 新規ジョブ: `redesign_v1` が既定値。
+- Cron: 3分間隔で有効。
+- 実行ロック: `unlocked`。
+- 既存試験データ削除: 未実施。
+- 新方式の実ジョブ・Gemini呼び出しテスト: 未実施。
+- 本番環境への適用: 未実施。別途レビュー・判断する。
+
 開発検証は既存の無料Supabaseプロジェクトで行い、有料のSupabase開発ブランチは作成しない。
 
 ## 安全な適用順序（Cron稼働中の段階切替）
