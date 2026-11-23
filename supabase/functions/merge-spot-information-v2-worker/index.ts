@@ -544,6 +544,7 @@ review_required：訪問先である可能性はあるが、情報だけでは�
   "decision": "accepted / rejected / review_required",
   "decisionReason": "判定理由",
   "name": "${spotName}",
+  "address": "",
   "guide_data": {
     "catchCopy": "",
     "topReason": "",
