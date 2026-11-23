@@ -9,7 +9,7 @@ const corsHeaders = {
 const MAX_HTML_LENGTH = 500_000;
 const MAX_TEXT_LENGTH = 12_000;
 const MAX_PAGES_PER_RUN = 5;
-const MAX_SITEMAPS_PER_RUN = 1;
+const MAX_SITEMAPS_PER_RUN = 2;
 const MAX_LOCATIONS_PER_SITEMAP = 10_000;
 const MAX_DISCOVERED_LINKS_PER_PAGE = 500;
 
@@ -88,10 +88,17 @@ async function fetchDocument(
     if (!response.ok) throw new Error(`取得失敗: HTTP ${response.status}`);
 
     const contentType = response.headers.get("content-type") ?? "";
-    if (!/(text\/html|xml|text\/plain)/i.test(contentType)) {
+    if (!/(text\/html|xml|text\/plain|gzip|octet-stream)/i.test(contentType)) {
       throw new Error("HTML/XML以外のファイルです。");
     }
-    const body = await response.text();
+    let body: string;
+    if (/gzip|octet-stream/i.test(contentType) || /\.gz(?:$|\?)/i.test(new URL(currentUrl).pathname)) {
+      const compressed = await response.arrayBuffer();
+      const decompressed = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+      body = await new Response(decompressed).text();
+    } else {
+      body = await response.text();
+    }
     if (body.length > MAX_HTML_LENGTH) throw new Error("ページが大きすぎます。");
     return { body, contentType, finalUrl: currentUrl };
   }
@@ -330,7 +337,7 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        const links = extractLinks(page.body, safeUrl, allowedHosts);
+        const links = extractLinks(page.body, page.finalUrl, allowedHosts);
         const discovered = links.map((link) => ({
           url: link.url,
           link_label: link.label,
