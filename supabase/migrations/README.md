@@ -6,7 +6,7 @@
 - 2026-11-19までの25件: 2026-11-23の調査時点でDBに適用済みのSQL
 - `20261123101725_spot_import_redesign_phase1.sql`: Phase 1マイグレーション。2026-11-23に無料開発プロジェクトへ適用済み
 - `20261123102705_admin_only_facility_retry.sql`: 施設単位エラー再開をシステム管理者に限定するRPC。2026-11-23に無料開発プロジェクトへ適用済み
-- `20261123103200_expose_job_pipeline_version.sql`: ジョブ一覧RPCへpipeline_versionを追加。2026-11-23に無料開発プロジェクトへ適用済み
+- `20261123102825_expose_job_pipeline_version.sql`: ジョブ一覧RPCへpipeline_versionを追加。2026-11-23に無料開発プロジェクトへ適用済み
 - `20261123102705_admin_only_facility_retry.sql`: 施設単位エラー再開をシステム管理者に限定するRPC。2026-11-23に無料開発プロジェクトへ適用済み
 
 ## 注意
