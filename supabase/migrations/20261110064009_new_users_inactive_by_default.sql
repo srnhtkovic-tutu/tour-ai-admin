@@ -1,0 +1,1 @@
+alter table public.user_profiles alter column is_active set default false;
