@@ -70,9 +70,16 @@ async function callRpc(name: string, args: Record<string, unknown>) {
   return data;
 }
 
-async function markMergeTimeoutSkipped(jobId: string, spotName: string, detail: string) {
+async function markMergeTimeoutSkipped(
+  jobId: string,
+  spotName: string,
+  detail: string,
+  timeoutType: "edge_function" | "gemini_signal",
+) {
   const now = new Date().toISOString();
-  const reason = "情報統合WorkerのEdge Function実行時間上限に達したため、この施設をスキップしました。";
+  const reason = timeoutType === "gemini_signal"
+    ? "Geminiへのリクエストが規定時間内に完了しなかったため、この施設をスキップしました。"
+    : "情報統合WorkerのEdge Function実行時間上限に達したため、この施設をスキップしました。";
   const { data: existing, error: findError } = await supabase
     .from("spot_import_merged_v2")
     .select("id,relevance_progress")
@@ -88,7 +95,8 @@ async function markMergeTimeoutSkipped(jobId: string, spotName: string, detail: 
     job_id: jobId,
     spot_name: spotName,
     status: "skipped",
-    skip_reason: "edge_function_timeout",
+    skip_reason: "information_merge_timeout",
+    timeout_type: timeoutType,
     reason,
     timeout_detail: detail.slice(0, 1000),
     skipped_at: now,
@@ -489,19 +497,34 @@ Deno.serve(async (req: Request) => {
         const edgeFunctionTimedOut =
           (response.status === 504 && /Request idle timeout limit/i.test(raw)) ||
           (response.status === 546 && /wall clock time limit reached/i.test(raw));
+        // WorkerがGeminiのAbortSignal.timeoutで返す、既知のタイムアウトだけを追加対象にする。
+        // HTTP 500のほかのエラーは従来どおり異常停止させる。
+        const geminiSignalTimedOut =
+          response.status === 500 && workerResult?.error === "Signal timed out.";
+        const timeoutType = edgeFunctionTimedOut
+          ? "edge_function"
+          : geminiSignalTimedOut
+            ? "gemini_signal"
+            : null;
 
-        if (edgeFunctionTimedOut && pipelineVersion === "redesign_v1") {
-          // Edge Functionの壁時計時間上限・リクエスト待機時間上限だけを施設単位スキップとする。
-          // CPU/メモリ等の546、fetch例外、Geminiエラー、その他HTTPエラーは通常の異常停止とする。
-          await markMergeTimeoutSkipped(jobId, task.spot_name, raw);
+        if (timeoutType && pipelineVersion === "redesign_v1") {
+          // 既知のEdge Function実行時間上限、またはGeminiの既知のSignal timeoutだけを施設単位でスキップする。
+          // CPU/メモリ等の546、fetch例外、その他HTTPエラーは通常の異常停止とする。
+          await markMergeTimeoutSkipped(jobId, task.spot_name, raw, timeoutType);
           logEvent("dispatcher.merge_facility_skipped_timeout", {
             invocation_id: invocationId,
             job_id: jobId,
             execution_id: executionId,
             spot_name: task.spot_name,
             http_status: response.status,
+            timeout_type: timeoutType,
           });
-          workerResult = { success: true, facility_status: "skipped", reason: "edge_function_timeout" };
+          workerResult = {
+            success: true,
+            facility_status: "skipped",
+            reason: "information_merge_timeout",
+            timeout_type: timeoutType,
+          };
         } else if (!response.ok || workerResult?.success === false || workerResult?.error) {
           throw new Error(`統合Workerエラー: ${JSON.stringify(workerResult).slice(0, 1200)}`);
         }
