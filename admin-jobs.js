@@ -125,7 +125,9 @@ async function loadFacilityErrors(jobs) {
     .from("spot_import_merged_v2")
     .select("id,job_id,spot_name,status,relevance_status,relevance_progress,error_message")
     .in("job_id", redesignJobIds)
-    .or("status.eq.failed,relevance_status.eq.failed")
+    .or(
+      "status.eq.failed,relevance_status.eq.failed,relevance_progress->>skip_reason.eq.edge_function_timeout,relevance_progress->>skip_reason.eq.information_merge_timeout"
+    )
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -140,36 +142,61 @@ async function loadFacilityErrors(jobs) {
 
   if (!Array.isArray(data) || data.length === 0) return;
 
+  const jobsById = new Map(jobs.map(job => [job.id, job]));
+  const retryableCandidates = data.filter(candidate => {
+    const progress = candidate.relevance_progress || {};
+    const isTimeoutSkipped =
+      candidate.status === "skipped" &&
+      candidate.relevance_status === "skipped" &&
+      ["edge_function_timeout", "information_merge_timeout"].includes(progress.skip_reason);
+    if (!isTimeoutSkipped) return true;
+    const parentJob = jobsById.get(candidate.job_id);
+    return parentJob?.status === "completed" && parentJob?.final_outcome === "partial_error";
+  });
+  if (retryableCandidates.length === 0) return;
+
   const panel = document.createElement("section");
   panel.className = "panel";
-  panel.append(makeText("h2", "施設単位のエラー（システム管理者専用）"));
+  panel.append(makeText("h2", "施設単位のエラー・タイムアウト（システム管理者専用）"));
   panel.append(makeText(
     "p",
-    "失敗した施設だけを再開できます。再開時は保存済みの正常な進捗を保持します。",
+    "失敗した施設は保存済みの進捗から再開します。タイムアウトでスキップされた施設は、その施設の情報統合を最初から再実行します。",
     "help-text"
   ));
 
-  data.forEach(candidate => {
+  retryableCandidates.forEach(candidate => {
     const card = document.createElement("article");
     card.className = "job-card";
     const progress = candidate.relevance_progress || {};
-    const retryKind = candidate.relevance_status === "failed" ||
-      progress.status === "failed" ? "ABCD評価" : "情報統合";
-    const errorText = retryKind === "ABCD評価"
-      ? (progress.last_error || candidate.error_message || "詳細なエラー情報はありません。")
-      : (progress.merge_error || candidate.error_message || "詳細なエラー情報はありません。");
+    const isTimeoutSkipped =
+      candidate.status === "skipped" &&
+      candidate.relevance_status === "skipped" &&
+      ["edge_function_timeout", "information_merge_timeout"].includes(progress.skip_reason);
+    const retryKind = isTimeoutSkipped
+      ? "タイムアウトでスキップ"
+      : candidate.relevance_status === "failed" || progress.status === "failed"
+        ? "ABCD評価"
+        : "情報統合";
+    const errorText = isTimeoutSkipped
+      ? (progress.reason || candidate.error_message || "タイムアウトが発生しました。")
+      : retryKind === "ABCD評価"
+        ? (progress.last_error || candidate.error_message || "詳細なエラー情報はありません。")
+        : (progress.merge_error || candidate.error_message || "詳細なエラー情報はありません。");
 
     card.append(makeText("strong", candidate.spot_name));
-    card.append(makeText("p", "失敗工程：" + retryKind));
-    card.append(makeText("p", "エラー：" + String(errorText).slice(0, 500), "job-error"));
+    card.append(makeText("p", "状態：" + retryKind));
+    card.append(makeText("p", "理由：" + String(errorText).slice(0, 500), "job-error"));
 
     const actions = document.createElement("div");
     actions.className = "job-actions";
-    const retryButton = makeActionButton("この施設を再開", async () => {
-      if (!window.confirm(
-        "「" + candidate.spot_name + "」の" + retryKind +
-        "を再開しますか？保存済みの正常な進捗は保持されます。"
-      )) return;
+    const retryButton = makeActionButton(
+      isTimeoutSkipped ? "この施設を再実行" : "この施設を再開",
+      async () => {
+      const confirmationText = isTimeoutSkipped
+        ? "「" + candidate.spot_name + "」の情報統合を最初から再実行しますか？"
+        : "「" + candidate.spot_name + "」の" + retryKind +
+          "を再開しますか？保存済みの正常な進捗は保持されます。";
+      if (!window.confirm(confirmationText)) return;
       retryButton.disabled = true;
       const { data: result, error: retryError } = await adminSupabase.rpc(
         "admin_retry_spot_import_facility",
