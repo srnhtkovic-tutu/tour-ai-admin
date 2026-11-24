@@ -209,7 +209,7 @@ async function loadFacilityErrors(jobs) {
         jobMessage.textContent = explainJobError(retryError);
         return;
       }
-      jobMessage.textContent = "「" + candidate.spot_name + "」の再開を登録しました。";
+      jobMessage.textContent = "「" + candidate.spot_name + "」の再実行を登録しました。";
       console.info("admin_retry_spot_import_facility:", result);
       await loadJobs();
     });
