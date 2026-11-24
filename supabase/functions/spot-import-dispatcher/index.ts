@@ -180,6 +180,17 @@ async function getNextMergeTask(jobId: string): Promise<MergeTask> {
     }
     if (row.merged_data && row.relevance_progress?.merged_at) continue;
 
+    // 管理者が施設単位の再実行を指示し、統合進捗を初期化した状態。
+    if (
+      row.status === "pending" &&
+      row.relevance_status === "pending" &&
+      !row.relevance_progress &&
+      Array.isArray(row.relevance_results) &&
+      row.relevance_results.length === 0
+    ) {
+      return { spot_name: spotName, mode: "process" };
+    }
+
     throw new Error(`スポット「${spotName}」に未完了の統合データが残っています。自動再開は行いません。`);
   }
 
