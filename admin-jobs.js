@@ -303,8 +303,6 @@ function renderAnomalyLock(lock) {
   panel.className = "job-anomaly";
 
   const lockedJob = lock.job || {};
-  const completedRecoveryParent =
-    lockedJob.status === "completed" && lockedJob.current_stage === "human_review";
   panel.append(makeText("strong", "システム異常ロックが発生しています"));
   panel.append(makeText(
     "p",
