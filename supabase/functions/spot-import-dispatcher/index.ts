@@ -458,7 +458,7 @@ Deno.serve(async (req: Request) => {
           : pipelineVersion === "redesign_v1"
             ? await getNextMergeTask(jobId)
             : await getNextMergeTaskLegacy(jobId);
-        if (recoveryMode && !task.spot_name) {
+        if (recoveryMode && (!task || !task.spot_name)) {
           throw new Error("施設単位再実行の対象施設名が実行権情報にありません。");
         }
       } catch (error) {
