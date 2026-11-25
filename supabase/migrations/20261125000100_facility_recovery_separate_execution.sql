@@ -240,7 +240,7 @@ begin
   if v_recovery_details is not null then
     v_recovery_candidate_id := nullif(v_recovery_details->>'candidate_id', '')::uuid;
     if v_recovery_candidate_id is null
-       or p_spot_name is distinct from v_recovery_details->>'spot_name'
+       or p_spot_name is distinct from (v_recovery_details->>'spot_name')
        or not exists (
          select 1
          from public.spot_import_merged_v2 m
