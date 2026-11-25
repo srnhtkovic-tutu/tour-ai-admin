@@ -45,10 +45,13 @@ begin
 
   update public.spot_import_merged_v2
   set status = 'pending', relevance_status = 'pending', relevance_results = '[]'::jsonb,
-      relevance_progress = jsonb_build_object('recovery_request', jsonb_build_object(
-        'candidate_id', p_candidate_id, 'requested_at', v_requested_at,
-        'requested_by', auth.uid(), 'retry_kind', v_retry_kind, 'restart_from_beginning', true
-      )),
+      relevance_progress = jsonb_build_object(
+        'recovery_requested_at', v_requested_at,
+        'recovery_request', jsonb_build_object(
+          'candidate_id', p_candidate_id, 'requested_at', v_requested_at,
+          'requested_by', auth.uid(), 'retry_kind', v_retry_kind, 'restart_from_beginning', true
+        )
+      ),
       merged_data = null, source_count = 0, input_char_count = 0,
       source_candidate_ids = '{}'::uuid[], source_url_ids = '{}'::uuid[], sources = '[]'::jsonb,
       model = null, relevance_model = null, error_message = null, updated_at = v_requested_at
@@ -224,6 +227,7 @@ begin
       select 1 from public.spot_import_merged_v2 m where m.job_id=p_job_id and (
         m.status='failed' or m.relevance_status='failed'
         or m.relevance_progress->>'skip_reason' in ('edge_function_timeout','information_merge_timeout')
+          or m.relevance_progress ? 'recovery_request'
       )
     ) into v_has_facility_errors;
     v_outcome:=case when v_has_facility_errors then 'partial_error' else 'normal_completed' end;
