@@ -190,6 +190,97 @@ begin
 end;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.mark_spot_import_execution_anomaly(
+  p_job_id uuid,
+  p_execution_id uuid,
+  p_lock_token uuid,
+  p_reason text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO ''
+AS $function$
+declare
+  v_region_id uuid;
+  v_stage text;
+  v_recovery_details jsonb;
+  v_candidate_id uuid;
+begin
+  if auth.role() <> 'service_role' then
+    raise exception 'not_authorized';
+  end if;
+  if p_reason is null or length(trim(p_reason)) = 0 then
+    raise exception 'anomaly_reason_required';
+  end if;
+
+  select region_id, current_stage into v_region_id, v_stage
+  from public.spot_import_jobs
+  where id = p_job_id;
+
+  select l.details into v_recovery_details
+  from private.spot_import_execution_logs l
+  where l.job_id = p_job_id
+    and l.execution_id = p_execution_id
+    and l.event_type = 'facility_recovery_claimed'
+  order by l.created_at desc
+  limit 1;
+
+  if v_recovery_details is not null then
+    v_stage := 'information_merge';
+    v_candidate_id := nullif(v_recovery_details->>'candidate_id', '')::uuid;
+  end if;
+
+  update private.spot_import_system_control
+  set lock_status = 'anomaly',
+      anomaly_reason = left(p_reason, 1000),
+      updated_at = now()
+  where id = 1
+    and lock_status = 'active'
+    and locked_job_id = p_job_id
+    and execution_id = p_execution_id
+    and lock_token = p_lock_token;
+
+  if not found then
+    raise exception 'execution_lock_mismatch';
+  end if;
+
+  if v_candidate_id is not null then
+    update public.spot_import_merged_v2
+    set status = 'failed',
+        relevance_status = 'failed',
+        error_message = left(p_reason, 2000),
+        relevance_progress = coalesce(relevance_progress, '{}'::jsonb) ||
+          jsonb_build_object(
+            'status', 'failed',
+            'merge_status', 'failed',
+            'last_error', left(p_reason, 2000),
+            'facility_recovery_failed_at', now()
+          ),
+        updated_at = now()
+    where id = v_candidate_id
+      and job_id = p_job_id;
+  end if;
+
+  perform private.write_spot_import_execution_log(
+    'anomaly_detected',
+    p_job_id,
+    p_execution_id,
+    v_region_id,
+    v_stage,
+    left(p_reason, 1000),
+    case
+      when v_candidate_id is not null then jsonb_build_object(
+        'facility_recovery', true,
+        'candidate_id', v_candidate_id,
+        'spot_name', v_recovery_details->>'spot_name'
+      )
+      else '{}'::jsonb
+    end
+  );
+end;
+$function$;
+
 CREATE OR REPLACE FUNCTION public.finish_spot_import_execution(
   p_job_id uuid,p_execution_id uuid,p_lock_token uuid,p_next_stage text DEFAULT NULL
 )
