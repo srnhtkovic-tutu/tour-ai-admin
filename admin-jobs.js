@@ -336,6 +336,9 @@ function renderAnomalyLock(lock) {
 
 async function releaseAnomalyLock(lock, button) {
   if (!jobIsSystemAdmin || !lock?.locked_job_id) return;
+  const lockedJob = lock.job || {};
+  const completedRecoveryParent =
+    lockedJob.status === "completed" && lockedJob.current_stage === "human_review";
 
   const confirmed = window.confirm(
     "異常ロックを解除します。\n\n" +
