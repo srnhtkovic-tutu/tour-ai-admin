@@ -125,6 +125,9 @@ async function loadFacilityErrors(jobs) {
     .from("spot_import_merged_v2")
     .select("id,job_id,spot_name,status,relevance_status,relevance_progress,error_message")
     .in("job_id", redesignJobIds)
+    .or(
+      "status.eq.failed,relevance_status.eq.failed,relevance_progress->>skip_reason.eq.edge_function_timeout,relevance_progress->>skip_reason.eq.information_merge_timeout,relevance_progress->>execution_kind.eq.facility_recovery,relevance_progress->>recovery_requested_at.not.is.null"
+    )
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -156,7 +159,7 @@ async function loadFacilityErrors(jobs) {
       progress.status === "failed" ||
       progress.merge_status === "failed";
     const isRecoveryRecord = progress.execution_kind === "facility_recovery";
-    const isRecoveryRequested = !!progress.recovery_request;
+    const isRecoveryRequested = !!progress.recovery_request || !!progress.recovery_requested_at;
     return isTimeoutSkipped || isFailed || isRecoveryRecord || isRecoveryRequested;
   });
   if (retryableCandidates.length === 0) return;
