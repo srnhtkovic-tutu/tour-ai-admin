@@ -125,9 +125,6 @@ async function loadFacilityErrors(jobs) {
     .from("spot_import_merged_v2")
     .select("id,job_id,spot_name,status,relevance_status,relevance_progress,error_message")
     .in("job_id", redesignJobIds)
-    .or(
-      "status.eq.failed,relevance_status.eq.failed,relevance_progress->>skip_reason.eq.edge_function_timeout,relevance_progress->>skip_reason.eq.information_merge_timeout"
-    )
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -158,7 +155,8 @@ async function loadFacilityErrors(jobs) {
       candidate.relevance_status === "failed" ||
       progress.status === "failed" ||
       progress.merge_status === "failed";
-    return isTimeoutSkipped || isFailed;
+    const isRecoveryRecord = progress.execution_kind === "facility_recovery";
+    return isTimeoutSkipped || isFailed || isRecoveryRecord;
   });
   if (retryableCandidates.length === 0) return;
 
@@ -179,11 +177,18 @@ async function loadFacilityErrors(jobs) {
       candidate.status === "skipped" &&
       candidate.relevance_status === "skipped" &&
       ["edge_function_timeout", "information_merge_timeout"].includes(progress.skip_reason);
-    const retryKind = isTimeoutSkipped
-      ? "タイムアウトでスキップ"
-      : candidate.relevance_status === "failed" || progress.status === "failed"
-        ? "ABCD評価の失敗"
-        : "情報統合の失敗";
+    const isRecoveryRecord = progress.execution_kind === "facility_recovery";
+    const retryKind = isRecoveryRecord && progress.merged_at
+      ? "施設単位の再実行完了"
+      : isRecoveryRecord && isTimeoutSkipped
+        ? "再実行後もタイムアウト"
+        : isRecoveryRecord
+          ? "施設単位の再実行中"
+          : isTimeoutSkipped
+            ? "タイムアウトでスキップ"
+            : candidate.relevance_status === "failed" || progress.status === "failed"
+              ? "ABCD評価の失敗"
+              : "情報統合の失敗";
     const errorText = isTimeoutSkipped
       ? (progress.reason || candidate.error_message || "タイムアウトが発生しました。")
       : (progress.last_error || progress.merge_error || candidate.error_message || "詳細なエラー情報はありません。");
@@ -194,6 +199,12 @@ async function loadFacilityErrors(jobs) {
 
     const actions = document.createElement("div");
     actions.className = "job-actions";
+    const canRetry = isTimeoutSkipped ||
+      candidate.status === "failed" ||
+      candidate.relevance_status === "failed" ||
+      progress.status === "failed" ||
+      progress.merge_status === "failed";
+    if (canRetry) {
     const retryButton = makeActionButton("この施設を再実行", async () => {
       if (!window.confirm(
         "「" + candidate.spot_name + "」の情報統合を最初から再実行しますか？\n" +
@@ -214,7 +225,10 @@ async function loadFacilityErrors(jobs) {
       await loadJobs();
     });
     actions.append(retryButton);
-    card.append(actions);
+    } else if (isRecoveryRecord) {
+      actions.append(makeText("span", "再実行の処理状態を表示しています。"));
+    }
+    if (actions.childNodes.length) card.append(actions);
     panel.append(card);
   });
 
