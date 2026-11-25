@@ -643,6 +643,7 @@ async function handleStart(jobId: string, spotName: string, restart: boolean, ex
     const skippedProgress = {
       job_id: jobId,
       spot_name: spotName,
+      ...(restart ? { execution_kind: "facility_recovery", recovery_started_at: new Date().toISOString() } : {}),
       status: "skipped",
       total_pages: 0,
       candidate_ids: candidateIds,
@@ -665,6 +666,7 @@ async function handleStart(jobId: string, spotName: string, restart: boolean, ex
   const progress = {
     job_id: jobId,
     spot_name: spotName,
+    ...(restart ? { execution_kind: "facility_recovery", recovery_started_at: new Date().toISOString() } : {}),
     status: "in_progress",
     total_pages: snapshot.length,
     candidate_ids: candidateIds,
@@ -974,6 +976,7 @@ Deno.serve(async (req: Request) => {
     const mode = String(body.mode || "").trim().toLowerCase();
     const executionId = String(body.execution_id || "").trim();
     const lockToken = String(body.lock_token || "").trim();
+    const recoveryMode = body.recovery === true;
 
     if (!jobId || !isUuid(jobId)) return jsonResponse({ error: "job_idは正しいUUID形式で指定してください。" }, 400);
     if (!spotName) return jsonResponse({ error: "spot_nameを指定してください。" }, 400);
@@ -988,7 +991,7 @@ Deno.serve(async (req: Request) => {
     // 施設1件について、関連性評価の全バッチと情報統合を同じEdge Function実行内で完了する。
     // Cronをまたぐ途中再開・自動再試行は行わない。
     let state = await readWorkerResponse(
-      await handleStart(jobId, spotName, false, executionId, lockToken),
+      await handleStart(jobId, spotName, recoveryMode, executionId, lockToken),
     );
     if (state.mode === "skipped") return jsonResponse(state);
 
