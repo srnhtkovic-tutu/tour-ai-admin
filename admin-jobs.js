@@ -187,18 +187,26 @@ async function loadFacilityErrors(jobs) {
       ? "施設単位の再実行待ち"
       : isRecoveryRecord && progress.merged_at
         ? "施設単位の再実行完了"
-      : isRecoveryRecord && isTimeoutSkipped
-        ? "再実行後もタイムアウト"
-        : isRecoveryRecord
-          ? "施設単位の再実行中"
+        : isRecoveryRecord && isTimeoutSkipped
+          ? "再実行後もタイムアウト"
+          : isRecoveryRecord && progress.status === "failed"
+            ? "施設単位の再実行でエラー"
+            : isRecoveryRecord && progress.status === "skipped"
+              ? "施設単位の再実行完了（通常スキップ）"
+              : isRecoveryRecord
+                ? "施設単位の再実行中"
           : isTimeoutSkipped
             ? "タイムアウトでスキップ"
             : candidate.relevance_status === "failed" || progress.status === "failed"
               ? "ABCD評価の失敗"
               : "情報統合の失敗";
-    const errorText = isTimeoutSkipped
-      ? (progress.reason || candidate.error_message || "タイムアウトが発生しました。")
-      : (progress.last_error || progress.merge_error || candidate.error_message || "詳細なエラー情報はありません。");
+    const errorText = isRecoveryRequested
+      ? "システム全体の実行待ちです。"
+      : isRecoveryRecord && progress.merged_at
+        ? "施設の情報統合が完了しました。"
+        : isTimeoutSkipped
+          ? (progress.reason || candidate.error_message || "タイムアウトが発生しました。")
+          : (progress.last_error || progress.merge_error || candidate.error_message || "詳細なエラー情報はありません。");
 
     card.append(makeText("strong", candidate.spot_name));
     card.append(makeText("p", "状態：" + retryKind));
