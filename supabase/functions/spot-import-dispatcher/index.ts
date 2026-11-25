@@ -375,7 +375,9 @@ Deno.serve(async (req: Request) => {
     logEvent("dispatcher.claim_completed", {
       invocation_id: invocationId, duration_ms: Math.round(performance.now() - claimStarted),
       claim_status: claim?.status ?? (claim ? "claimed" : "idle"),
-      job_id: claim?.job_id ?? null, execution_id: claim?.execution_id ?? null, stage: claim?.stage ?? null,
+      job_id: claim?.job_id ?? null, execution_id: claim?.execution_id ?? null,
+      stage: claim?.stage ?? null, facility_recovery: claim?.recovery === true,
+      candidate_id: claim?.candidate_id ?? null,
     });
 
     if (!claim) {
@@ -387,6 +389,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ status: "anomaly", message: "実行リース期限切れを検出しました。管理者の確認が必要です。" }, 409);
     }
 
+    const recoveryMode = claim.recovery === true;
     const stage = String(claim.stage ?? "");
     const jobId = String(claim.job_id ?? "");
     const executionId = String(claim.execution_id ?? "");
@@ -450,9 +453,14 @@ Deno.serve(async (req: Request) => {
     if (stage === "information_merge") {
       let task: MergeTask;
       try {
-        task = pipelineVersion === "redesign_v1"
-          ? await getNextMergeTask(jobId)
-          : await getNextMergeTaskLegacy(jobId);
+        task = recoveryMode
+          ? { spot_name: String(claim.spot_name ?? ""), mode: "process" }
+          : pipelineVersion === "redesign_v1"
+            ? await getNextMergeTask(jobId)
+            : await getNextMergeTaskLegacy(jobId);
+        if (recoveryMode && !task.spot_name) {
+          throw new Error("施設単位再実行の対象施設名が実行権情報にありません。");
+        }
       } catch (error) {
         const wrapped = new Error(`情報統合タスク選択中に失敗: ${safeLogText(error)}`);
         (wrapped as Error & { cause?: unknown; context?: string }).cause = error;
@@ -482,7 +490,7 @@ Deno.serve(async (req: Request) => {
             },
             body: JSON.stringify({
               job_id: jobId, execution_id: executionId, lock_token: lockToken,
-              mode: task.mode, spot_name: task.spot_name,
+              mode: task.mode, spot_name: task.spot_name, recovery: recoveryMode,
             }),
           });
         } catch (error) {
@@ -542,9 +550,11 @@ Deno.serve(async (req: Request) => {
 
         let nextTask: MergeTask;
         try {
-          nextTask = pipelineVersion === "redesign_v1"
-            ? await getNextMergeTask(jobId)
-            : await getNextMergeTaskLegacy(jobId);
+          nextTask = recoveryMode
+            ? null
+            : pipelineVersion === "redesign_v1"
+              ? await getNextMergeTask(jobId)
+              : await getNextMergeTaskLegacy(jobId);
         } catch (error) {
           const wrapped = new Error(`統合Worker完了後の次タスク確認中に失敗: ${safeLogText(error)}`);
           (wrapped as Error & { cause?: unknown; context?: string }).cause = error;
@@ -621,6 +631,7 @@ Deno.serve(async (req: Request) => {
     const finishStarted = performance.now();
     logEvent("dispatcher.finish_started", {
       invocation_id: invocationId, job_id: jobId, execution_id: executionId, stage,
+      facility_recovery: recoveryMode, candidate_id: claim?.candidate_id ?? null,
       next_stage: nextStage, has_more_work: hasMoreWork,
     });
     const finishResult = await callRpc("finish_spot_import_execution", {
@@ -646,6 +657,7 @@ Deno.serve(async (req: Request) => {
       worker: workerSlug,
       worker_mode: workerMode,
       spot_name: workerSpotName,
+      facility_recovery: recoveryMode,
       has_more_work: hasMoreWork,
       next_stage: finishResult?.current_stage ?? null,
       job_status: finishResult?.status ?? null,
