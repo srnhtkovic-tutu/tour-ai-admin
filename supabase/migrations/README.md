@@ -10,6 +10,10 @@
 - `20261123103234_add_spot_import_reevaluation_staging.sql`: 再評価結果の一時保存列とWorker専用保存RPCを追加。2026-11-23に無料開発プロジェクトへ適用済み
 - `20261123194300_remove_unused_spot_import_reevaluation.sql`: 再評価機能を実装対象外としたため、上記の専用列・RPCを削除。2026-11-23に無料開発プロジェクトへ適用済み
 
+## 未適用
+
+- `20261125000100_facility_recovery_separate_execution.sql`: 施設単位の再実行を通常ジョブから分離し、親ジョブを `completed / human_review` のまま維持する変更。2026-11-25時点では開発ブランチに追加しただけで、Supabase無料開発プロジェクトには未適用。適用前にSQLレビュー・検証を行う。
+
 ## 注意
 
 - Phase 1の適用先はSupabaseプロジェクト `fugibstqzkmzplqrpovn` です。
