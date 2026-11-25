@@ -107,6 +107,7 @@ begin
   join public.regions r on r.id=j.region_id
   where m.status='pending' and m.relevance_status='pending'
     and m.relevance_progress ? 'recovery_request'
+    and m.relevance_progress->'recovery_request'->>'candidate_id' = m.id::text
     and j.pipeline_version='redesign_v1' and j.status='completed'
     and j.current_stage='human_review' and j.final_outcome='partial_error'
     and m.review_status='pending' and m.reviewed_data is null and m.approved_spot_id is null
