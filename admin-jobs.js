@@ -303,6 +303,8 @@ function renderAnomalyLock(lock) {
   panel.className = "job-anomaly";
 
   const lockedJob = lock.job || {};
+  const completedRecoveryParent =
+    lockedJob.status === "completed" && lockedJob.current_stage === "human_review";
   panel.append(makeText("strong", "システム異常ロックが発生しています"));
   panel.append(makeText(
     "p",
@@ -338,8 +340,11 @@ async function releaseAnomalyLock(lock, button) {
   const confirmed = window.confirm(
     "異常ロックを解除します。\n\n" +
     "実行前に、古いWorkerが停止していることをログ等で確認してください。\n" +
-    "解除後、対象ジョブは一時停止状態になります。\n" +
-    "ジョブの再開は別操作です。取得済みデータはリセットされません。\n\n" +
+    (completedRecoveryParent
+      ? "対象ジョブは完了・人の審査待ち状態です。解除後もこの状態を維持します。\n"
+      : "解除後、対象ジョブは一時停止状態になります。\n" +
+        "ジョブの再開は別操作です。") +
+    "取得済みデータはリセットされません。\n\n" +
     "古いWorkerが停止していることを確認しましたか？"
   );
   if (!confirmed) return;
@@ -399,8 +404,9 @@ async function releaseAnomalyLock(lock, button) {
   }
 
   await loadJobs();
-  jobMessage.textContent =
-    "異常ロックを解除しました。対象ジョブは一時停止状態です。データはリセットしていません。ジョブの再開はまだ行っていません。";
+  jobMessage.textContent = completedRecoveryParent
+    ? "異常ロックを解除しました。対象ジョブは完了・人の審査待ち状態を維持しています。データはリセットしていません。"
+    : "異常ロックを解除しました。対象ジョブは一時停止状態です。データはリセットしていません。ジョブの再開はまだ行っていません。";
 }
 
 async function createJob(event) {
