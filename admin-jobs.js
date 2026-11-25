@@ -156,7 +156,8 @@ async function loadFacilityErrors(jobs) {
       progress.status === "failed" ||
       progress.merge_status === "failed";
     const isRecoveryRecord = progress.execution_kind === "facility_recovery";
-    return isTimeoutSkipped || isFailed || isRecoveryRecord;
+    const isRecoveryRequested = !!progress.recovery_request;
+    return isTimeoutSkipped || isFailed || isRecoveryRecord || isRecoveryRequested;
   });
   if (retryableCandidates.length === 0) return;
 
@@ -178,8 +179,11 @@ async function loadFacilityErrors(jobs) {
       candidate.relevance_status === "skipped" &&
       ["edge_function_timeout", "information_merge_timeout"].includes(progress.skip_reason);
     const isRecoveryRecord = progress.execution_kind === "facility_recovery";
-    const retryKind = isRecoveryRecord && progress.merged_at
-      ? "施設単位の再実行完了"
+    const isRecoveryRequested = !!progress.recovery_request;
+    const retryKind = isRecoveryRequested
+      ? "施設単位の再実行待ち"
+      : isRecoveryRecord && progress.merged_at
+        ? "施設単位の再実行完了"
       : isRecoveryRecord && isTimeoutSkipped
         ? "再実行後もタイムアウト"
         : isRecoveryRecord
@@ -199,11 +203,11 @@ async function loadFacilityErrors(jobs) {
 
     const actions = document.createElement("div");
     actions.className = "job-actions";
-    const canRetry = isTimeoutSkipped ||
+    const canRetry = !isRecoveryRequested && (isTimeoutSkipped ||
       candidate.status === "failed" ||
       candidate.relevance_status === "failed" ||
       progress.status === "failed" ||
-      progress.merge_status === "failed";
+      progress.merge_status === "failed");
     if (canRetry) {
     const retryButton = makeActionButton("この施設を再実行", async () => {
       if (!window.confirm(
@@ -225,7 +229,7 @@ async function loadFacilityErrors(jobs) {
       await loadJobs();
     });
     actions.append(retryButton);
-    } else if (isRecoveryRecord) {
+    } else if (isRecoveryRecord || isRecoveryRequested) {
       actions.append(makeText("span", "再実行の処理状態を表示しています。"));
     }
     if (actions.childNodes.length) card.append(actions);
