@@ -404,7 +404,10 @@ begin
           ),
         updated_at = now()
     where id = v_candidate_id
-      and job_id = p_job_id;
+      and job_id = p_job_id
+      and review_status = 'pending'
+      and reviewed_data is null
+      and approved_spot_id is null;
   end if;
 
   perform private.write_spot_import_execution_log(
