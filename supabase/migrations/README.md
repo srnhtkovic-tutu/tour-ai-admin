@@ -12,7 +12,7 @@
 
 ## 未適用
 
-- `20261125000100_facility_recovery_separate_execution.sql`: 施設単位の再実行を通常ジョブから分離し、親ジョブを `completed / human_review` のまま維持する変更。2026-11-25時点では開発ブランチに追加しただけで、Supabase無料開発プロジェクトには未適用。適用前にSQLレビュー・検証を行う。
+- `20261125000100_facility_recovery_separate_execution.sql`: 施設単位の再実行を通常ジョブから分離し、親ジョブを `completed / human_review` のまま維持する変更。2026-11-25時点でSQLレビュー、既存関数シグネチャ照合、主要SELECT文のEXPLAINを実施済み。ただしマイグレーション全体のDB適用前コンパイル検証とDeno/TypeScript型チェックは未実施。Supabase無料開発プロジェクトには未適用。
 
 ## 注意
 
