@@ -98,5 +98,4 @@ begin
   update public.spot_import_merged_v2 set review_status='approved',reviewed_by=auth.uid(),reviewed_at=now(),approved_spot_id=v_spot_id,updated_at=now() where id=p_candidate_id;
   return v_spot_id;
 end;
-$function$
-
+$function$;
