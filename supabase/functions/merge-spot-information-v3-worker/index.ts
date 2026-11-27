@@ -386,6 +386,17 @@ review_required：訪問先である可能性はあるが、情報だけでは�
 8. 提供主体や現在の提供状況が確認できない活動は、現在利用できるサービスとして記載しないでください。
 9. 対象スポットそのものの自然環境や歴史的特徴と、事業者が提供する体験サービスを区別してください。
 
+【スポットの位置づけ・親子関係】
+次のspot_typeのいずれかを判定してください。
+- independent_facility：寺社、博物館、店舗、道の駅など、それ自体が独立した訪問先となる施設
+- nested_spot：寺社の奥之院・境内の庭園や堂宇、施設内の展示・見どころなど、別の施設の敷地・管理範囲内にある訪問対象
+- standalone_spot：滝、展望地、史跡、巨木など、親施設に属さない単独の場所
+- undetermined：情報源だけでは判断できない
+nested_spotの場合のみ、親施設の正式名称をsuggested_parent_nameに記載してください。情報源に明確な根拠がない場合は空文字にしてください。
+親施設の名前を推測してはいけません。独立した施設と、その敷地内の見どころを混同しないでください。
+relationship_reasonには分類根拠を短く記載してください。確証がない場合はundeterminedにしてください。
+この分類は提案であり、最終判断は人による審査で行います。
+
 【必ず守ること】
 - 情報源にない事実を推測・創作しないでください。不明な文字列は空文字、配列は空配列にしてください。
 - 地域の人や観光協会が推薦していると、情報源に明示されていない限り書いてはいけません。一般的なWeb記載を「地元の人の声」「地域のおすすめ」と言い換えないでください。
@@ -402,6 +413,9 @@ review_required：訪問先である可能性はあるが、情報だけでは�
 {
   "decision": "accepted / rejected / review_required",
   "decisionReason": "判定理由",
+  "spot_type": "independent_facility / nested_spot / standalone_spot / undetermined",
+  "suggested_parent_name": "",
+  "relationship_reason": "",
   "name": "${spotName}",
   "address": "",
   "guide_data": {
