@@ -7,19 +7,19 @@ alter table public.spots
 
 do $$
 begin
-  if not exists (select 1 from pg_constraint where conname='spots_spot_type_check') then
+  if not exists (select 1 from pg_constraint where conname='spots_spot_type_check' and conrelid='public.spots'::regclass) then
     alter table public.spots add constraint spots_spot_type_check
       check (spot_type is null or spot_type in ('independent_facility','nested_spot','standalone_spot'));
   end if;
-  if not exists (select 1 from pg_constraint where conname='spots_parent_not_self_check') then
+  if not exists (select 1 from pg_constraint where conname='spots_parent_not_self_check' and conrelid='public.spots'::regclass) then
     alter table public.spots add constraint spots_parent_not_self_check
       check (parent_spot_id is null or parent_spot_id <> id);
   end if;
-  if not exists (select 1 from pg_constraint where conname='spots_parent_spot_id_fkey') then
+  if not exists (select 1 from pg_constraint where conname='spots_parent_spot_id_fkey' and conrelid='public.spots'::regclass) then
     alter table public.spots add constraint spots_parent_spot_id_fkey
       foreign key (parent_spot_id) references public.spots(id) on delete restrict;
   end if;
-  if not exists (select 1 from pg_constraint where conname='spots_parent_type_consistency_check') then
+  if not exists (select 1 from pg_constraint where conname='spots_parent_type_consistency_check' and conrelid='public.spots'::regclass) then
     alter table public.spots add constraint spots_parent_type_consistency_check
       check (
         (spot_type='nested_spot' and parent_spot_id is not null)
