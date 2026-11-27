@@ -19,7 +19,14 @@ begin
     alter table public.spots add constraint spots_parent_spot_id_fkey
       foreign key (parent_spot_id) references public.spots(id) on delete restrict;
   end if;
-end $$;
+  if not exists (select 1 from pg_constraint where conname='spots_parent_type_consistency_check') then
+    alter table public.spots add constraint spots_parent_type_consistency_check
+      check (
+        (spot_type='nested_spot' and parent_spot_id is not null)
+        or (spot_type is distinct from 'nested_spot' and parent_spot_id is null)
+      );
+  end if;
+end $;
 
 create index if not exists spots_parent_spot_id_idx
   on public.spots(parent_spot_id) where parent_spot_id is not null;
