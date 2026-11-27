@@ -3,6 +3,7 @@ const reviewRegionId = new URLSearchParams(location.search).get("region");
 let reviewUserId = null;
 let reviewRegionName = "";
 let reviewCandidates = [];
+let reviewParentSpots=[];
 let selectedReviewId = null;
 
 const reviewMessage = document.getElementById("reviewMessage");
@@ -44,6 +45,10 @@ async function loadReviewCandidates() {
     .order("created_at",{ascending:false});
   if(error){reviewMessage.textContent="審査候補を読み込めませんでした。DB権限を確認してください。";console.error(error);return;}
   reviewCandidates=data||[];
+  const {data:parentSpots,error:parentError}=await adminSupabase.from("spots")
+    .select("id,name,address,spot_type").eq("region_id",reviewRegionId).order("name");
+  if(parentError){reviewMessage.textContent="親施設候補を読み込めませんでした。";console.error(parentError);return;}
+  reviewParentSpots=(parentSpots||[]).filter(s=>s.spot_type!=="nested_spot");
   reviewMessage.textContent=reviewRegionName+" ・ 審査待ち "+reviewCandidates.length+"件";
   if(!reviewCandidates.length){
     const empty=document.createElement("p");empty.className="empty-state";empty.textContent="審査待ちの候補はありません。";
@@ -127,6 +132,41 @@ function renderCandidate(id) {
   const panel=element("section",null,"panel");
   panel.append(element("h2","内容の確認・編集"));
   const form=element("form");form.id="reviewForm";form._geocoding=geocoding;
+  const relationshipPanel=element("div",null,"review-relationship-panel");
+  relationshipPanel.append(element("h3","スポットの位置づけ"));
+  relationshipPanel.append(element("p","このスポットが独立した施設か、施設内の見どころか、単独の場所かを確認してください。AIの提案は必ず人が確認します。","review-meta"));
+  const typeLabel=element("label","スポットの種類");
+  const typeSelect=element("select");typeSelect.id="reviewSpotType";
+  [
+    ["undetermined","未判定（確認が必要）"],
+    ["independent_facility","独立した施設"],
+    ["nested_spot","施設内のスポット"],
+    ["standalone_spot","単独のスポット"]
+  ].forEach(([value,label])=>{const option=element("option",label);option.value=value;typeSelect.append(option);});
+  typeSelect.value=base.spot_type||ai.spot_type||"undetermined";
+  typeLabel.htmlFor=typeSelect.id;
+  relationshipPanel.append(typeLabel,typeSelect);
+  const parentWrap=element("div",null,"field");
+  const parentLabel=element("label","親施設（本番登録済みの施設から選択）");
+  parentLabel.htmlFor="reviewParentSpot";
+  const parentSelect=element("select");parentSelect.id="reviewParentSpot";
+  const noParent=element("option","親施設を選択してください");noParent.value="";
+  parentSelect.append(noParent);
+  reviewParentSpots.forEach(spot=>{
+    const option=element("option",spot.name+"（ID: "+spot.id+"）"+(spot.address?" ／ "+spot.address:""));
+    option.value=String(spot.id);parentSelect.append(option);
+  });
+  const suggestedParent=base.suggested_parent_name||ai.suggested_parent_name||"";
+  const suggestedMatch=reviewParentSpots.find(s=>s.name.trim()===String(suggestedParent).trim());
+  const savedParentId=base.parent_spot_id??ai.parent_spot_id??(suggestedMatch?String(suggestedMatch.id):"");
+  if(savedParentId)parentSelect.value=String(savedParentId);
+  parentWrap.append(parentLabel,parentSelect);
+  if(suggestedParent)parentWrap.append(element("p","Geminiの親施設候補: "+suggestedParent+"（候補を選択して確認してください）","review-meta"));
+  if(base.relationship_reason||ai.relationship_reason)parentWrap.append(element("p","AIの判断理由: "+(base.relationship_reason||ai.relationship_reason),"review-meta"));
+  relationshipPanel.append(parentWrap);
+  const updateParentVisibility=()=>{parentWrap.hidden=typeSelect.value!=="nested_spot";};
+  typeSelect.addEventListener("change",updateParentVisibility);
+  updateParentVisibility();
   const mapPanel=element("div",null,"review-map-panel");
   mapPanel.append(element("h3","地図で位置を設定"));
   mapPanel.append(element("p","地図をクリックすると、その場所にマーカーが移動して緯度・経度に反映されます。マーカーをドラッグして微調整することもできます。","review-meta"));
@@ -137,6 +177,15 @@ function renderCandidate(id) {
   locationSearch.append(element("p","必要な施設だけ、審査担当者の操作で検索します。検索しただけでは座標は保存・確定されません。","review-meta"));
   const placeQueryWrap=element("div",null,"review-search-row");
   const placeQuery=element("input");placeQuery.type="text";placeQuery.id="reviewPlaceQuery";placeQuery.value=[base.name||candidate.spot_name,base.address||""].filter(Boolean).join(" ");placeQuery.maxLength=500;placeQuery.placeholder="施設名＋地域・住所";
+  const updateParentSearchQuery=()=>{
+    if(typeSelect.value!=="nested_spot")return;
+    const parent=reviewParentSpots.find(s=>String(s.id)===parentSelect.value);
+    if(!parent)return;
+    placeQuery.value=[base.name||candidate.spot_name,parent.name,parent.address||base.address||""].filter(Boolean).join(" ");
+  };
+  parentSelect.addEventListener("change",updateParentSearchQuery);
+  typeSelect.addEventListener("change",updateParentSearchQuery);
+  if(typeSelect.value==="nested_spot")updateParentSearchQuery();
   const placeButton=element("button","施設名で検索");placeButton.type="button";
   placeQueryWrap.append(placeQuery,placeButton);
   locationSearch.append(element("label","施設名検索（施設名＋住所・地域）"));locationSearch.append(placeQueryWrap);
@@ -176,7 +225,7 @@ function renderCandidate(id) {
   form._locationConfirmed=false;
   form._locationLookup=null;
   form._locationSource=base.location_source||null;
-  form.append(locationSearch,mapPanel,grid);
+  form.append(relationshipPanel,locationSearch,mapPanel,grid);
   const error=element("p","","form-error");error.id="reviewFormError";form.append(error);
   const actions=element("div",null,"review-action-row");
   const save=element("button","修正内容を保存");save.type="button";save.addEventListener("click",()=>saveReview(candidate.id,form,error,save));
@@ -333,6 +382,8 @@ function collectReviewData(form){
   const lng=lngText===""?null:Number(lngText);
   return {
     name,address,lat,lng,guide_data:guide,
+    spot_type:form.querySelector("#reviewSpotType").value,
+    parent_spot_id:form.querySelector("#reviewParentSpot").value||null,
     geocoding:null,
     location_lookup:form._locationLookup||null,
     location_confirmed:form._locationConfirmed===true,
@@ -345,6 +396,9 @@ async function saveReview(id,form,error,button){
   const data=collectReviewData(form);
   if(!data.name||data.name.length>100){error.textContent="スポット名を1〜100文字で入力してください。";return;}
   if(data.address.length>200){error.textContent="住所は200文字以内で入力してください。";return;}
+  if(data.spot_type==="undetermined"){error.textContent="スポットの種類を選択してください。";form.querySelector("#reviewSpotType").focus();return;}
+  if(data.spot_type==="nested_spot"&&!data.parent_spot_id){error.textContent="施設内スポットには親施設を選択してください。";form.querySelector("#reviewParentSpot").focus();return;}
+  if(data.spot_type!=="nested_spot"&&data.parent_spot_id){error.textContent="親施設を設定できるのは施設内スポットだけです。";return;}
   if((data.lat===null)!==(data.lng===null)|| (data.lat!==null&&(!Number.isFinite(data.lat)||!Number.isFinite(data.lng)||data.lat < -90||data.lat>90||data.lng < -180||data.lng>180))){error.textContent="緯度・経度を正しく入力してください。";return;}
   if(data.guide_data.officialUrl.length>2000){error.textContent="公式サイトURLは2000文字以内で入力してください。";return;}
   for(const key of REVIEW_FIELDS){if(!["highlightPoints","tags"].includes(key)&&String(data.guide_data[key]||"").length>2000){error.textContent="各紹介項目は2000文字以内で入力してください。";form.querySelector("#review_"+key).focus();return;}}
@@ -361,6 +415,9 @@ async function approveReview(id,form,error,button){
   const data=collectReviewData(form);
   if(!data.name||data.name.length>100){error.textContent="スポット名を1〜100文字で入力してください。";return;}
   if(data.address.length>200){error.textContent="住所は200文字以内で入力してください。";return;}
+  if(data.spot_type==="undetermined"){error.textContent="スポットの種類を選択してください。";form.querySelector("#reviewSpotType").focus();return;}
+  if(data.spot_type==="nested_spot"&&!data.parent_spot_id){error.textContent="施設内スポットには親施設を選択してください。";form.querySelector("#reviewParentSpot").focus();return;}
+  if(data.spot_type!=="nested_spot"&&data.parent_spot_id){error.textContent="親施設を設定できるのは施設内スポットだけです。";return;}
   if((data.lat===null)!==(data.lng===null)||(data.lat!==null&&(!Number.isFinite(data.lat)||!Number.isFinite(data.lng)||data.lat < -90||data.lat>90||data.lng < -180||data.lng>180))){error.textContent="緯度・経度を正しく入力してください。";return;}
   if(data.lat===null||data.lng===null){error.textContent="位置情報が未設定です。緯度・経度を設定してから承認してください。";form.querySelector("#reviewLat").focus();return;}
   if(!data.location_confirmed){error.textContent="地図上の位置を確認し、「この位置を確認して確定」を押してから承認してください。";document.getElementById("reviewLocationConfirmStatus")?.scrollIntoView({behavior:"smooth",block:"center"});return;}
