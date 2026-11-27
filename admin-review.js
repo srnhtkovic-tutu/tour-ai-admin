@@ -176,7 +176,7 @@ function renderCandidate(id) {
   form._locationConfirmed=false;
   form._locationLookup=null;
   form._locationSource=base.location_source||null;
-  form.append(mapPanel,locationSearch,grid);
+  form.append(locationSearch,mapPanel,grid);
   const error=element("p","","form-error");error.id="reviewFormError";form.append(error);
   const actions=element("div",null,"review-action-row");
   const save=element("button","修正内容を保存");save.type="button";save.addEventListener("click",()=>saveReview(candidate.id,form,error,save));
@@ -222,6 +222,9 @@ function initializeReviewMap(initialLat,initialLng){
     placeReviewMarker(event.latlng.lat,event.latlng.lng,true);
     markReviewLocationUnconfirmed("manual_review");
     if(mapStatus)mapStatus.textContent="地図で選択した位置を緯度・経度欄に反映しました。";
+  });
+  ["reviewName","reviewAddress"].forEach(id=>{
+    document.getElementById(id).addEventListener("change",()=>markReviewLocationUnconfirmed("manual_review"));
   });
   ["reviewLat","reviewLng"].forEach(id=>{
     document.getElementById(id).addEventListener("change",()=>{
