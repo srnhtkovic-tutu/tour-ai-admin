@@ -67,6 +67,22 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 #resetPasswordButton { background: #e8efea; color: #294b39; }
 
 
+
+/* Human-triggered Google location lookup in AI review */
+.review-location-search{margin:18px 0 22px;padding:16px;border:1px solid #dce5df;border-radius:8px;background:#fff}
+.review-location-search h3{margin:0 0 8px;font-size:17px}
+.review-location-search label{display:block;margin:12px 0 6px;font-weight:600;font-size:14px}
+.review-search-row{display:flex;gap:8px}
+.review-search-row input{flex:1;min-width:0;padding:10px 12px;border:1px solid #bdcbc2;border-radius:6px;font:inherit}
+.review-search-row button{flex:none;min-height:40px}
+.review-location-results{display:grid;gap:10px;margin-top:10px}
+.review-location-result{padding:12px;border:1px solid #dce5df;border-radius:7px;background:#f8faf8}
+.review-location-result strong{display:block;overflow-wrap:anywhere}
+.review-location-result p{margin:5px 0}
+.review-location-result button{margin-top:7px}
+#reviewLocationConfirmStatus{margin-top:14px;font-weight:600}
+@media(max-width:600px){.review-search-row{flex-direction:column}.review-search-row button{width:100%}}
+
 /* AI review location picker */
 .review-map-panel{margin:18px 0 22px;padding:16px;border:1px solid #dce5df;border-radius:8px;background:#f8faf8}
 .review-map-panel h3{margin:0 0 8px;font-size:17px}
