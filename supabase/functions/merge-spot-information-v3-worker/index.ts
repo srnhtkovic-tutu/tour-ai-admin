@@ -764,6 +764,15 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
     decision,
     decisionReason,
     name: mergedName,
+    spot_type: ["independent_facility","nested_spot","standalone_spot","undetermined"].includes(aiResult?.spot_type)
+      ? aiResult.spot_type
+      : "undetermined",
+    suggested_parent_name: typeof aiResult?.suggested_parent_name === "string"
+      ? aiResult.suggested_parent_name.trim().slice(0,100)
+      : "",
+    relationship_reason: typeof aiResult?.relationship_reason === "string"
+      ? aiResult.relationship_reason.trim().slice(0,500)
+      : "",
     ...(address ? { address } : {}),
     lat: null,
     lng: null,
