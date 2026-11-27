@@ -71,147 +71,6 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-type GeocodingResult = {
-  status: "resolved" | "unresolved" | "no_address" | "error";
-  provider: "全国Q地図";
-  lat: number | null;
-  lng: number | null;
-  normalized_address: string | null;
-  coordinate_level: string | null;
-  match_level: string | null;
-  score: number | null;
-  map_url: string | null;
-  embed_url: string | null;
-  attribution: string;
-  checked_at: string;
-  reason: string;
-};
-
-async function geocodeAddress(address: string): Promise<GeocodingResult> {
-  const checkedAt = new Date().toISOString();
-  const base = {
-    provider: "全国Q地図" as const,
-    lat: null,
-    lng: null,
-    normalized_address: null,
-    coordinate_level: null,
-    match_level: null,
-    score: null,
-    map_url: null,
-    embed_url: null,
-    attribution: "住所データ: デジタル庁 アドレス・ベース・レジストリ / 地図: 全国Q地図 (https://qchizu.jp)",
-    checked_at: checkedAt,
-  };
-  const query = String(address || "")
-    .replace(/^〒?\s*\d{3}-?\d{4}\s*/, "")
-    .trim();
-  if (!query) {
-    return { ...base, status: "no_address", reason: "住所が登録されていません。" };
-  }
-
-  try {
-    const url = new URL("https://api.qchizu.jp/geocode.php");
-    url.searchParams.set("address", query.slice(0, 500));
-    const response = await fetch(url.toString(), {
-      headers: { "Accept": "application/json" },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!response.ok) {
-      return { ...base, status: "error", reason: `住所検索サービスがHTTP ${response.status}を返しました。` };
-    }
-    const payload = await response.json();
-    const results = Array.isArray(payload?.results) ? payload.results : [];
-    if (!results.length) {
-      return {
-        ...base,
-        attribution: String(payload?.attribution || base.attribution),
-        status: "unresolved",
-        reason: "住所に一致する位置情報が見つかりませんでした。",
-      };
-    }
-
-    const candidates = results
-      .filter((item: any) => item?.result && typeof item.result === "object")
-      .sort((a: any, b: any) => Number(b.result.score || 0) - Number(a.result.score || 0));
-    const best = candidates[0];
-    if (!best) {
-      return { ...base, status: "unresolved", reason: "住所に一致する位置情報が見つかりませんでした。" };
-    }
-
-    const result = best.result;
-    const rawLat = result.lat;
-    const rawLng = result.lon;
-    const lat = Number(rawLat);
-    const lng = Number(rawLng);
-    const score = Number.isFinite(Number(result.score)) ? Number(result.score) : null;
-    const coordinateLevel = String(result.coordinate_level || "");
-    const matchLevel = String(result.match_level || "");
-    const mapUrl = typeof best.links?.qchizu_map === "string" ? best.links.qchizu_map : null;
-    const embedUrl = typeof best.links?.qchizu_embed === "string" ? best.links.qchizu_embed : null;
-    const attribution = String(payload?.attribution || base.attribution);
-    const acceptedLevels = new Set([
-      "machiaza_detail",
-      "residential_block",
-      "residential_detail",
-      "parcel",
-    ]);
-    const coordinatesValid =
-      rawLat !== null && rawLat !== undefined &&
-      rawLng !== null && rawLng !== undefined &&
-      Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
-      Number.isFinite(lng) && lng >= -180 && lng <= 180;
-    const qualityAccepted =
-      coordinatesValid &&
-      acceptedLevels.has(coordinateLevel) &&
-      score !== null && score >= 0.7 &&
-      !!mapUrl && !!attribution;
-
-    if (!qualityAccepted) {
-      return {
-        ...base,
-        normalized_address: typeof result.output === "string" ? result.output : null,
-        coordinate_level: coordinateLevel || null,
-        match_level: matchLevel || null,
-        score,
-        map_url: mapUrl,
-        embed_url: embedUrl,
-        attribution,
-        status: "unresolved",
-        reason: !coordinatesValid
-          ? "住所は照合されましたが、利用可能な座標が返されませんでした。"
-          : !acceptedLevels.has(coordinateLevel)
-            ? `座標精度が低いため自動設定しませんでした（${coordinateLevel || "不明"}）。`
-            : score === null || score < 0.7
-              ? "住所の一致度が十分でないため自動設定しませんでした。"
-              : "地図リンクまたは出典情報を確認できないため自動設定しませんでした。",
-      };
-    }
-
-    return {
-      ...base,
-      lat,
-      lng,
-      normalized_address: typeof result.output === "string" ? result.output : null,
-      coordinate_level: coordinateLevel,
-      match_level: matchLevel || null,
-      score,
-      map_url: mapUrl,
-      embed_url: embedUrl,
-      attribution,
-      status: "resolved",
-      reason: "住所から位置情報を取得しました。審査画面で位置を確認してください。",
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("住所からの緯度経度取得に失敗:", message);
-    return {
-      ...base,
-      status: "error",
-      reason: "住所検索サービスに接続できませんでした。審査画面で位置を手動設定してください。",
-    };
-  }
-}
-
 // URLを正規化して、同じページを識別する。
 function normalizeUrl(url: string): string {
   if (!url) return "";
@@ -886,15 +745,16 @@ async function handleMerge(jobId: string, spotName: string, executionId: string,
   const address = typeof aiResult?.address === "string" ? aiResult.address.trim() : "";
   const guideData = normalizeGuideData(aiResult?.guide_data);
 
-  const geocoding = await geocodeAddress(address);
+  // 座標取得は人による審査段階で明示的に実行する。候補統合時はAPIを呼び出さない。
   const mergedData = {
     decision,
     decisionReason,
     name: mergedName,
     ...(address ? { address } : {}),
-    lat: geocoding.status === "resolved" ? geocoding.lat : null,
-    lng: geocoding.status === "resolved" ? geocoding.lng : null,
-    geocoding,
+    lat: null,
+    lng: null,
+    geocoding: null,
+    location_source: null,
     guide_data: guideData,
   };
 
