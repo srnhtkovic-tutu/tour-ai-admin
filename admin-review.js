@@ -48,7 +48,7 @@ async function loadReviewCandidates() {
   const {data:parentSpots,error:parentError}=await adminSupabase.from("spots")
     .select("id,name,address,spot_type").eq("region_id",reviewRegionId).order("name");
   if(parentError){reviewMessage.textContent="親施設候補を読み込めませんでした。";console.error(parentError);return;}
-  reviewParentSpots=(parentSpots||[]).filter(s=>s.spot_type!=="nested_spot");
+  reviewParentSpots=(parentSpots||[]).filter(s=>s.spot_type===null||s.spot_type==="independent_facility");
   reviewMessage.textContent=reviewRegionName+" ・ 審査待ち "+reviewCandidates.length+"件";
   if(!reviewCandidates.length){
     const empty=document.createElement("p");empty.className="empty-state";empty.textContent="審査待ちの候補はありません。";
@@ -143,7 +143,8 @@ function renderCandidate(id) {
     ["nested_spot","施設内のスポット"],
     ["standalone_spot","単独のスポット"]
   ].forEach(([value,label])=>{const option=element("option",label);option.value=value;typeSelect.append(option);});
-  typeSelect.value=base.spot_type||ai.spot_type||"undetermined";
+  const suggestedType=base.spot_type||ai.spot_type||"undetermined";
+  typeSelect.value=["independent_facility","nested_spot","standalone_spot","undetermined"].includes(suggestedType)?suggestedType:"undetermined";
   typeLabel.htmlFor=typeSelect.id;
   relationshipPanel.append(typeLabel,typeSelect);
   const parentWrap=element("div",null,"field");
@@ -164,7 +165,7 @@ function renderCandidate(id) {
   if(suggestedParent)parentWrap.append(element("p","Geminiの親施設候補: "+suggestedParent+"（候補を選択して確認してください）","review-meta"));
   if(base.relationship_reason||ai.relationship_reason)parentWrap.append(element("p","AIの判断理由: "+(base.relationship_reason||ai.relationship_reason),"review-meta"));
   relationshipPanel.append(parentWrap);
-  const updateParentVisibility=()=>{parentWrap.hidden=typeSelect.value!=="nested_spot";};
+  const updateParentVisibility=()=>{parentWrap.hidden=typeSelect.value!=="nested_spot";if(typeSelect.value!=="nested_spot")parentSelect.value="";};
   typeSelect.addEventListener("change",updateParentVisibility);
   updateParentVisibility();
   const mapPanel=element("div",null,"review-map-panel");
