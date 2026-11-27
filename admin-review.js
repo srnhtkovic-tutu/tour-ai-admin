@@ -158,8 +158,8 @@ function renderCandidate(id) {
     option.value=String(spot.id);parentSelect.append(option);
   });
   const suggestedParent=base.suggested_parent_name||ai.suggested_parent_name||"";
-  const suggestedMatch=reviewParentSpots.find(s=>s.name.trim()===String(suggestedParent).trim());
-  const savedParentId=base.parent_spot_id??ai.parent_spot_id??(suggestedMatch?String(suggestedMatch.id):"");
+  // Gemini's parent name is a suggestion only; the reviewer must explicitly choose a registered record.
+  const savedParentId=base.parent_spot_id??"";
   if(savedParentId)parentSelect.value=String(savedParentId);
   parentWrap.append(parentLabel,parentSelect);
   if(suggestedParent)parentWrap.append(element("p","Geminiの親施設候補: "+suggestedParent+"（候補を選択して確認してください）","review-meta"));
