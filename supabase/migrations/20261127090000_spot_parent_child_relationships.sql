@@ -26,7 +26,7 @@ begin
         or (spot_type is distinct from 'nested_spot' and parent_spot_id is null)
       );
   end if;
-end; $;
+end; $$;
 
 create index if not exists spots_parent_spot_id_idx
   on public.spots(parent_spot_id) where parent_spot_id is not null;
