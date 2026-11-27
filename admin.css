@@ -114,3 +114,28 @@ button:disabled { opacity: .55; cursor: not-allowed; }
 .help-text{display:block;color:#687970;line-height:1.6;font-size:13px}
 .field small.help-text{margin-top:5px}
 @media(max-width:700px){.job-form-grid{grid-template-columns:1fr}.job-card-heading{flex-direction:column}}
+
+
+/* Spot parent-child relationship review */
+.review-relationship-panel {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid #d7e1da;
+  border-radius: 12px;
+  background: #f8faf8;
+}
+.review-relationship-panel h3 { margin: 0; }
+.review-relationship-panel label { display: block; font-weight: 600; margin-bottom: 6px; }
+.review-relationship-panel select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #b9c9bf;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.review-relationship-panel [hidden] { display: none !important; }
